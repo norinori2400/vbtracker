@@ -626,6 +626,86 @@
             #lineupModal .lineup-rotate-count { min-height: 48px; width: 100%; }
         }
 
+    
+
+        /* ===== Ver.1.2.11 iPad実機向けコンパクト調整 ===== */
+        body.compact-ready, body { padding: 6px; }
+        .container { max-width: 1180px; }
+        .title-bar { margin-bottom: 4px; }
+        .title-bar h1 { font-size: clamp(1.05rem, 2.2vw, 1.45rem); line-height: 1.1; }
+
+        .top-tool-dock { grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 6px; }
+        .tool-btn { padding: 8px 6px; font-size: 0.78rem; border-radius: 10px; min-height: 36px; }
+
+        .header-panel { gap: 8px !important; margin-bottom: 8px !important; }
+        .scoreboard { height: 132px; min-height: 132px; padding: 7px 10px; border-radius: 10px; }
+        .score-num { font-size: clamp(2.65rem, 5.8vw, 3.45rem); }
+        .set-info { font-size: 0.92rem; padding: 6px 8px; min-width: 66px; }
+        .set-info button { margin-top: 5px !important; padding: 3px 8px !important; font-size: 0.74rem !important; }
+        .team-score > div:first-child { font-size: 0.82rem !important; margin-bottom: 0 !important; }
+        .to-count { font-size: 0.68rem; }
+        .sub-panel-btns { margin-top: 2px; gap: 3px; }
+        .to-btn, .sub-btn { padding: 3px 6px; font-size: 0.68rem; border-radius: 5px; }
+        .scoreboard-left-setup { gap: 3px; }
+        .scoreboard-left-setup > span { font-size: 0.58rem !important; }
+        .side-btn { padding: 4px 9px; font-size: 0.7rem; }
+        .opp-name-input { width: 86px; font-size: 0.74rem; padding: 3px 5px; margin-bottom: 2px; }
+
+        .rotation-court { height: 132px; padding: 6px; padding-top: 21px; gap: 4px; border-radius: 10px; }
+        .court-title { font-size: 0.62rem; top: 3px; left: 5px; }
+        .pos-cell { border-radius: 5px; padding: 1px; }
+        .pos-num { font-size: 0.95rem; margin-bottom: 0; }
+        .pos-name { font-size: 0.58rem; max-width: 58px; }
+        .pos-cell.server .pos-num { font-size: 1.05rem; }
+        .pos-cell.server::after { font-size: 0.48rem; padding: 2px 4px; top: 2px; right: 3px; }
+
+        .player-grid-box { padding: 7px 9px !important; margin-bottom: 8px !important; border-radius: 10px; }
+        .player-grid-box > span { font-size: 0.76rem; }
+        .player-buttons { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 5px; margin-top: 6px; }
+        .p-btn { padding: 6px 3px; font-size: 0.72rem; border-radius: 6px; border-width: 1px; min-height: 32px; }
+        .p-btn.active { transform: none; }
+
+        .grid { gap: 8px; }
+        .panel { padding: 8px !important; border-radius: 10px; }
+        .panel h3 { font-size: 0.95rem; margin: 0 0 6px; }
+        .stat-section { margin-bottom: 6px !important; padding-bottom: 5px !important; }
+        .section-title { font-size: 0.78rem; margin-bottom: 4px; }
+        .btn-group { gap: 4px; }
+        .btn { min-height: 34px !important; padding: 6px 4px; font-size: 0.74rem; border-radius: 6px; }
+        .log-container { min-height: 190px !important; max-height: 310px !important; padding: 6px; }
+        .grid > .panel:first-child .log-container { height: 280px !important; }
+        .log-item { padding: 4px 6px; margin-bottom: 3px; font-size: 0.74rem; border-left-width: 5px; }
+        .main-action-strip { gap: 6px; }
+        .main-action-strip .action-btn, .action-btn { padding: 8px; font-size: 0.78rem; border-radius: 8px; }
+        .grid > .panel:nth-child(3) { padding: 6px 8px !important; }
+
+        @media (min-width: 900px) {
+            .header-panel { display: grid; grid-template-columns: 1.55fr 0.72fr; align-items: stretch; }
+            .grid { grid-template-columns: minmax(290px, 0.82fr) minmax(430px, 1.18fr); }
+            .grid > .panel:nth-child(3) { grid-column: 1 / -1; }
+        }
+
+        @media (max-width: 899px) {
+            .top-tool-dock { grid-template-columns: repeat(3, 1fr); }
+            .scoreboard { min-height: 138px; height: auto; }
+            .header-panel { gap: 6px !important; }
+            .player-buttons { grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); }
+            .grid > .panel:first-child .log-container { height: 210px !important; }
+        }
+
+        @media (orientation: landscape) and (max-height: 820px) {
+            .title-bar h1 { font-size: 1.02rem; }
+            .title-bar { margin-bottom: 3px; }
+            .top-tool-dock { margin-bottom: 5px; }
+            .scoreboard, .rotation-court { height: 122px; min-height: 122px; }
+            .score-num { font-size: clamp(2.45rem, 5vw, 3.15rem); }
+            .player-buttons { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
+            .p-btn { min-height: 30px; font-size: 0.7rem; padding: 5px 3px; }
+            .grid > .panel:first-child .log-container { height: 245px !important; }
+            .btn { min-height: 31px !important; padding: 5px 3px; }
+            .stat-section { margin-bottom: 4px !important; padding-bottom: 4px !important; }
+        }
+
     </style>
 </head>
 <body>
@@ -2506,4 +2586,21 @@
     initSetup(); updateUI();
 </script>
 </body>
-</html>
+</html><!-- Ver.1.2.12 equal-height running score / stats panels -->
+<style>
+@media (min-width: 900px) {
+  .grid { align-items: stretch !important; }
+  .grid > .panel:nth-child(1),
+  .grid > .panel:nth-child(2) {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+  }
+  .grid > .panel:first-child .log-container {
+    flex: 1 1 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+}
+</style>
