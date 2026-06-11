@@ -1,0 +1,3220 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEIMEI HS Volleyball Tracker</title>
+    <!-- Ver.1.1.1: archive dark mode and server visibility fix -->
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VB Tracker">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icons/icon-192.png">
+    <style>
+        :root {
+            --primary: #1e3a8a; --success: #059669; --danger: #dc2626;
+            --warning: #f59e0b; --purple: #8b5cf6; --gray: #f3f4f6; --dark: #1f2937;
+            --selected-blue: #1d4ed8;
+        }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 15px; background: #f0f2f5; color: var(--dark); }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        .title-bar { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 15px; 
+            position: relative;
+        }
+        .title-bar h1 { 
+            flex: 1; 
+            text-align: center; 
+            color: var(--primary); 
+            margin: 0; 
+            padding-left: 90px; 
+        }
+        @media (max-width: 480px) {
+            .title-bar h1 { padding-left: 0; font-size: 1.5rem; }
+            .title-bar { flex-direction: column; gap: 10px; }
+        }
+        
+        h2, h3 { text-align: center; color: var(--primary); margin: 5px 0; }
+        
+        /* 上段パネル */
+        .header-panel { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
+        @media (min-width: 768px) { 
+            .header-panel { flex-direction: row; align-items: stretch; }
+            .history-panel-box { flex: 0.8; }
+            .scoreboard-box { flex: 1.4; }
+            .rotation-panel-box { flex: 0.8; }
+        }
+        
+        .scoreboard { display: flex; justify-content: space-around; align-items: center; background: linear-gradient(135deg, var(--primary), #3b82f6); color: white; padding: 10px 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 170px; box-sizing: border-box; }
+        .team-score { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .score-num { font-size: 4.2rem; font-weight: bold; font-family: monospace; line-height: 1; margin: 2px 0; }
+        .score-num.set-winner-ready { color: #fde047 !important; text-shadow: 0 0 10px rgba(253, 224, 71, 0.9), 0 2px 3px rgba(0,0,0,0.65); }
+        .set-info { font-size: 1.1rem; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 20px; text-align: center; font-weight: bold; min-width: 80px; }
+        .to-count { font-size: 0.8rem; color: #fef08a; margin-top: 2px; }
+        .sub-panel-btns { display: flex; gap: 4px; justify-content: center; margin-top: 4px; }
+        .to-btn, .sub-btn { color: var(--dark); border: none; padding: 4px 8px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.75rem; }
+        .to-btn { background-color: var(--warning); }
+        .sub-btn { background-color: #e2e8f0; }
+
+        /* スコアボード左側の設定エリア（S/Rトグル用） */
+        .scoreboard-left-setup { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .start-side-toggle { display: flex; flex-direction: column; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.4); }
+        .side-btn { background: rgba(255,255,255,0.2); color: #cbd5e1; border: none; padding: 6px 12px; font-size: 0.8rem; font-weight: bold; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.2); }
+        .side-btn:last-child { border-bottom: none; }
+        .side-btn.active { background: #fef08a; color: #9a3412; }
+        
+        .opp-name-input { background: rgba(255, 255, 255, 0.2); color: white; border: 1px dashed rgba(255,255,255,0.6); padding: 4px 6px; border-radius: 4px; font-size: 0.85rem; text-align: center; width: 100px; cursor: pointer; font-weight: bold; margin-bottom: 5px; }
+        .opp-name-input:focus { background: white; color: var(--dark); border-style: solid; outline: none; }
+
+        /* 左側：セット履歴エリア */
+        .active-player-panel { background: white; padding: 10px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: flex-start; border: 1px solid #e5e7eb; height: 170px; box-sizing: border-box; }
+        .active-player-title { font-size: 0.8rem; color: #4b5563; font-weight: bold; text-align: center; margin-bottom: 5px; border-bottom: 1px solid #e5e7eb; padding-bottom: 3px; }
+        .history-scroll-box { flex: 1; overflow-y: auto; font-size: 0.75rem; color: #4b5563; padding: 2px 5px; background: #fafafa; border-radius: 4px; border: 1px solid #f0f0f0; }
+        .history-item { padding: 2px 0; border-bottom: 1px dashed #e5e7eb; }
+        .history-item:last-child { border-bottom: none; }
+
+        /* 右側：ローテ位置 */
+        .rotation-court { background: #e0f2fe; border: 2px solid var(--primary); border-radius: 12px; padding: 8px; padding-top: 24px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.1); height: 170px; box-sizing: border-box; }
+        .court-title { position: absolute; top: 4px; left: 6px; font-size: 0.7rem; font-weight: bold; color: var(--primary); background: rgba(255,255,255,0.85); padding: 1px 6px; border-radius: 4px; z-index: 5; }
+        .pos-cell { background: white; border: 1px solid #93c5fd; border-radius: 6px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; padding: 2px; }
+        .pos-cell.server { background: #fef08a; border-color: var(--warning); color: #9a3412; }
+        .num-red { color: var(--danger); font-weight: bold; }
+        .pos-num { font-size: 1.1rem; color: var(--primary); font-weight: bold; line-height: 1.1; margin-bottom: 2px; }
+        .pos-name { font-size: 0.65rem; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65px; text-align: center; }
+
+        /* 選手選択ボタン */
+        .player-grid-box { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .player-buttons { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; margin-top: 10px; }
+        .p-btn { padding: 10px 5px; font-size: 0.85rem; background-color: var(--gray); border: 2px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: bold; color: var(--dark); transition: all 0.1s ease; }
+        .p-btn.active { background-color: var(--selected-blue) !important; border-color: #0284c7 !important; color: white !important; box-shadow: 0 0 8px rgba(29, 78, 216, 0.5); transform: scale(1.02); }
+        .p-btn.opp-team-btn { background-color: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+        .p-btn.opp-team-btn.active { background-color: var(--danger) !important; border-color: #b91c1c !important; color: white !important; box-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
+        
+        /* 3段目 */
+        .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 1024px) { .grid { grid-template-columns: 3fr 4fr 5fr; } }
+        .panel { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .stat-section { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; }
+        .section-title { font-weight: bold; color: #4b5563; margin-bottom: 6px; display: block; font-size: 0.9rem; }
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .btn { width: 100%; padding: 10px 5px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85rem; box-sizing: border-box; text-align: center; }
+        .btn-plus { background-color: var(--success); }
+        .btn-minus { background-color: var(--danger); }
+        .btn-warn { background-color: var(--warning); color: var(--dark); }
+        
+        .tabs { display: flex; border-bottom: 2px solid #e5e7eb; margin-bottom: 15px; }
+        .tab { flex: 1; text-align: center; padding: 10px 5px; cursor: pointer; font-weight: bold; color: #6b7280; font-size: 0.85rem; }
+        .tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+        .table-container { max-height: 400px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; }
+        .stats-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+        .stats-table th, .stats-table td { padding: 9px 7px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        .stats-table th { background-color: var(--gray); position: sticky; top: 0; z-index: 10; }
+        
+        /* 得点割合分析のスタイル */
+        .analysis-box { margin-top: 15px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.8rem; }
+        .analysis-title { font-weight: bold; color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; gap: 4px; }
+        .ratio-bar-container { margin-bottom: 10px; }
+        .ratio-bar-container:last-child { margin-bottom: 0; }
+        .ratio-bar-labels { display: flex; justify-content: space-between; margin-bottom: 3px; font-weight: bold; }
+        .ratio-bar { display: flex; height: 16px; border-radius: 4px; overflow: hidden; background: #e2e8f0; }
+        .ratio-fill-own { background-color: #3b82f6; height: 100%; transition: width 0.3s ease; }
+        .ratio-fill-opp-err { background-color: #f59e0b; height: 100%; transition: width 0.3s ease; }
+        .ratio-fill-opp { background-color: #f59e0b; height: 100%; transition: width 0.3s ease; }
+        .ratio-fill-own-err { background-color: #dc2626; height: 100%; transition: width 0.3s ease; }
+
+        /* ランニングスコアのログスタイル */
+        .log-container { max-height: 450px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; background: #fafafa; }
+        .log-item { padding: 6px 8px; margin-bottom: 4px; border-radius: 4px; font-size: 0.85rem; border-left: 6px solid #6b7280; background: white; }
+        .log-item.us { border-left-color: #059669; background-color: #d1fae5; color: #065f46; font-weight: bold; }
+        .log-item.them { border-left-color: #dc2626; background-color: #fee2e2; color: #991b1b; font-weight: bold; }
+        .log-item.timeout { border-left-color: var(--warning); background-color: #fffbeb; font-weight: bold; color: #92400e; }
+        .log-item.substitution { border-left-color: var(--purple); background-color: #faf5ff; font-weight: bold; color: #6b21a8; }
+        .log-item.score-adjust { border-left-color: #0ea5e9; background-color: #e0f2fe; font-weight: bold; color: #075985; }
+        .score-adjust-btn { margin-top: 6px; padding: 5px 10px; font-size: 0.78rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 900; background: #0ea5e9; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.18); }
+        .score-adjust-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0; }
+        .score-adjust-card { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px; text-align: center; }
+        .score-adjust-card label { display:block; font-weight:900; margin-bottom:8px; color: var(--primary); }
+        .score-adjust-input { width: 100%; box-sizing: border-box; text-align:center; font-size: 2rem; font-weight:900; padding: 8px; border-radius: 10px; border: 1px solid #94a3b8; }
+        .score-adjust-controls { display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px; }
+        .score-adjust-controls button { padding: 10px; border: none; border-radius: 8px; font-size: 1rem; font-weight:900; cursor:pointer; }
+        .score-adjust-minus { background:#64748b; color:white; }
+        .score-adjust-plus { background:#2563eb; color:white; }
+        
+        .footer-btns { display: flex; gap: 10px; margin-top: 15px; }
+        .action-btn { flex: 1; background-color: #4b5563; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        
+        .bottom-setup-area { display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 20px; }
+        @media (min-width: 768px) { .bottom-setup-area { grid-template-columns: 1fr 2fr; } }
+        
+        .start-lineup-box { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 2px solid #93c5fd; }
+        .start-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+        .start-cell { background: #f0f9ff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; text-align: center; font-size: 0.8rem; cursor: pointer; font-weight: bold; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .start-cell:hover { background: #e0f2fe; border-color: var(--primary); }
+        .start-label { font-size: 0.55rem; color: #6b7280; font-weight: bold; transform: scale(0.85); margin-bottom: 2px; }
+        .start-num { font-size: 0.85rem; color: var(--primary); font-weight: bold; line-height: 1; }
+        .start-name { font-size: 0.55rem; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55px; transform: scale(0.9); margin-top: 2px; }
+
+        .edit-panel { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .edit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-top: 10px; }
+        .edit-input { display: flex; align-items: center; gap: 5px; }
+        .edit-input input { width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; }
+        
+
+        .log-item.editable-log { cursor: pointer; position: relative; }
+        .log-item.editable-log:hover { outline: 2px solid #60a5fa; }
+        .log-actions-hint { font-size: 0.7rem; opacity: 0.65; float: right; }
+        .export-btn { background-color: var(--primary); }
+        .print-btn { background-color: #0f766e; }
+        .csv-btn { background-color: #7c3aed; }
+        @media print {
+            body { background: white; padding: 0; }
+            .title-bar button, .player-grid-box, .stat-section, .bottom-setup-area, .archive-section, .footer-btns, .tabs, .scoreboard-left-setup, .sub-panel-btns { display: none !important; }
+            .container { max-width: none; }
+            .panel, .scoreboard, .active-player-panel, .rotation-court { box-shadow: none; break-inside: avoid; }
+        }
+
+        /* アーカイブセクション */
+        .archive-section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-top: 25px; border: 2px solid #cbd5e1; }
+        .archive-controls { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; background: var(--gray); padding: 12px; border-radius: 8px; align-items: flex-end; }
+        .archive-select { padding: 8px; font-size: 0.85rem; border-radius: 6px; border: 1px solid #cbd5e1; background: white; min-width: 180px; }
+        .archive-btn { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.85rem; }
+        .archive-btn.danger { background: var(--danger); }
+        
+        .header-reset-btn { background-color: var(--danger); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.85rem; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header-reset-btn:hover { background-color: #dc2626; }
+
+        .archive-layout { display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 10px; }
+        @media (min-width: 768px) { .archive-layout { grid-template-columns: 7fr 5fr; } }
+
+
+        /* タブレット向け：メイン画面整理・ポップアップメニュー */
+        .top-tool-dock { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 0 0 14px 0; }
+        .tool-btn { border: none; border-radius: 14px; padding: 12px 10px; background: linear-gradient(135deg, #ffffff, #eef2ff); color: var(--primary); font-weight: 800; font-size: 0.9rem; cursor: pointer; box-shadow: 0 4px 12px rgba(30, 58, 138, 0.12); border: 1px solid #dbeafe; }
+        .tool-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(30, 58, 138, 0.18); }
+        .main-action-strip { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+        .grid { grid-template-columns: 1fr; }
+        @media (min-width: 1024px) { .grid { grid-template-columns: 1fr 1.1fr; align-items: start; } }
+        @media (min-width: 768px) { .header-panel { grid-template-columns: 1.35fr 0.85fr; display: grid; align-items: stretch; } }
+        @media (max-width: 800px) { .top-tool-dock { grid-template-columns: repeat(2, 1fr); } .tool-btn { font-size: 0.82rem; padding: 10px 8px; } }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.58); z-index: 9999; padding: 18px; box-sizing: border-box; }
+        .modal-overlay.active { display: flex; justify-content: center; align-items: center; }
+        .modal-window { width: min(1120px, 100%); max-height: 92vh; overflow-y: auto; background: #f8fafc; border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.8); }
+        .modal-header { position: sticky; top: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 18px; background: linear-gradient(135deg, var(--primary), #3b82f6); color: white; border-radius: 18px 18px 0 0; }
+        .modal-header h2 { color: white; margin: 0; font-size: 1.05rem; text-align: left; }
+        .modal-close { background: rgba(255,255,255,0.18); color: white; border: 1px solid rgba(255,255,255,0.35); border-radius: 10px; padding: 8px 12px; font-weight: bold; cursor: pointer; }
+        .modal-body { padding: 16px; }
+        .modal-body .panel, .modal-body .start-lineup-box, .modal-body .edit-panel, .modal-body .archive-section, .modal-body .active-player-panel { margin: 0; box-shadow: none; }
+        .modal-body .active-player-panel { height: 60vh; }
+        .modal-body .history-scroll-box { font-size: 0.95rem; }
+
+        .lineup-picker { margin-top: 14px; display: none; background: #f8fafc; border: 2px solid #bfdbfe; border-radius: 14px; padding: 12px; }
+        .lineup-picker.active { display: block; }
+        .lineup-picker-title { font-weight: 800; color: var(--primary); margin-bottom: 10px; text-align: center; }
+        .lineup-player-buttons { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+        .lineup-player-btn { border: 2px solid #cbd5e1; background: white; color: var(--dark); border-radius: 10px; padding: 10px 6px; font-weight: 800; cursor: pointer; min-height: 48px; }
+        .lineup-player-btn:hover { background: #eff6ff; border-color: var(--primary); }
+        .lineup-player-btn.current { background: #dbeafe; border-color: var(--selected-blue); color: var(--primary); box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.12); }
+        .lineup-player-btn.used { background: #fef3c7; border-color: #f59e0b; color: #92400e; box-shadow: 0 0 0 2px rgba(245,158,11,0.18); }
+        .lineup-picker-actions { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }
+        .lineup-shift-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0 6px; }
+        .lineup-shift-btn { border: none; border-radius: 12px; padding: 12px 10px; font-weight: 900; cursor: pointer; font-size: 0.98rem; background: #e0f2fe; color: #1e3a8a; border: 2px solid #93c5fd; }
+        .lineup-shift-btn:hover { background: #bfdbfe; }
+        .lineup-cancel-btn { border: none; background: #64748b; color: white; border-radius: 10px; padding: 9px 18px; font-weight: bold; cursor: pointer; }
+
+        /* 選択式編集・交代メニュー */
+        .choice-modal-window { max-width: 760px; }
+        .choice-subtitle { color: #cbd5e1; font-size: 0.92rem; line-height: 1.6; margin: 0 0 14px 0; }
+        .choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+        .choice-grid.compact { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
+        .choice-btn { min-height: 54px; border-radius: 14px; border: 1px solid #334155; background: linear-gradient(135deg, #1e293b, #0f172a); color: #e5e7eb; font-weight: 800; font-size: 0.98rem; cursor: pointer; box-shadow: 0 8px 18px rgba(0,0,0,0.22); padding: 10px 8px; }
+        .choice-btn:hover { border-color: #60a5fa; background: linear-gradient(135deg, #172554, #0f172a); }
+        .choice-btn.danger { border-color: #7f1d1d; background: linear-gradient(135deg, #7f1d1d, #450a0a); color: #fee2e2; }
+        .choice-btn.success { border-color: #065f46; background: linear-gradient(135deg, #065f46, #022c22); color: #d1fae5; }
+        .choice-btn.warning { border-color: #92400e; background: linear-gradient(135deg, #92400e, #451a03); color: #fef3c7; }
+        .choice-player-num { display:block; font-size:1.1rem; color:#bfdbfe; }
+        .choice-player-name { display:block; font-size:0.78rem; color:#cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .choice-step-note { margin: 0 0 12px 0; padding: 10px; border-radius: 12px; background:#020617; border:1px solid #334155; color:#cbd5e1; font-size:0.9rem; }
+        .choice-step-note.out-label { border-color:#991b1b; color:#fecaca; }
+        .choice-step-note.in-label { border-color:#047857; color:#bbf7d0; }
+        .choice-btn.out-mode { border-color:#991b1b; background: linear-gradient(135deg, #991b1b, #450a0a); color:#fee2e2; }
+        .choice-btn.in-mode { border-color:#047857; background: linear-gradient(135deg, #047857, #022c22); color:#dcfce7; }
+
+        @media print { .top-tool-dock, .modal-overlay { display: none !important; } }
+        .backup-status-box { background:#0f172a; border:1px solid #334155; border-radius:10px; padding:10px; margin-top:10px; color:#cbd5e1; font-size:0.84rem; }
+        .backup-list { max-height:160px; overflow-y:auto; border:1px solid #334155; border-radius:8px; padding:6px; background:#020617; margin-top:8px; }
+        .backup-item { padding:5px 6px; border-bottom:1px dashed #334155; color:#e5e7eb; font-size:0.78rem; }
+        .backup-item:last-child { border-bottom:none; }
+
+    
+
+        /* ===== ダークモード＆タブレット作業エリア最適化（追記） ===== */
+        :root {
+            --primary: #60a5fa;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --purple: #a78bfa;
+            --gray: #1e293b;
+            --dark: #e5e7eb;
+            --selected-blue: #2563eb;
+            --bg-dark: #0f172a;
+            --panel-dark: #111827;
+            --panel-dark-2: #1e293b;
+            --line-dark: #334155;
+            --text-muted: #94a3b8;
+        }
+        html, body { min-height: 100%; }
+        body {
+            background: radial-gradient(circle at top, #1e293b 0, #0f172a 45%, #020617 100%);
+            color: #e5e7eb;
+            padding: 12px;
+            overflow-x: hidden;
+        }
+        .container { max-width: 1280px; }
+        .title-bar { margin-bottom: 10px; }
+        .title-bar h1, h2, h3 { color: #dbeafe; text-shadow: 0 1px 10px rgba(96,165,250,0.18); }
+        .header-reset-btn { background: linear-gradient(135deg, #991b1b, #ef4444); box-shadow: 0 8px 18px rgba(239,68,68,0.2); }
+
+        .top-tool-dock { gap: 8px; margin-bottom: 10px; }
+        .tool-btn {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            color: #e0f2fe;
+            border: 1px solid #334155;
+            box-shadow: 0 8px 22px rgba(0,0,0,0.28);
+        }
+        .tool-btn:hover { box-shadow: 0 10px 24px rgba(96,165,250,0.18); border-color: #60a5fa; }
+
+        .scoreboard {
+            background: linear-gradient(135deg, #172554, #1d4ed8 55%, #0f172a);
+            border: 1px solid rgba(147,197,253,0.35);
+            box-shadow: 0 10px 26px rgba(0,0,0,0.34);
+        }
+        .set-info { background: rgba(15,23,42,0.62); border: 1px solid rgba(147,197,253,0.25); }
+        .opp-name-input { background: rgba(15,23,42,0.5); color: #fff; border-color: rgba(147,197,253,0.55); }
+        .opp-name-input:focus { background: #0f172a; color: white; border-color: #60a5fa; }
+        .to-btn, .sub-btn { color: #0f172a; }
+        .sub-btn { background-color: #cbd5e1; }
+
+        .rotation-court {
+            background: linear-gradient(135deg, #0f172a, #172554);
+            border-color: #3b82f6;
+            box-shadow: 0 10px 24px rgba(0,0,0,0.3);
+        }
+        .court-title { color: #dbeafe; background: rgba(15,23,42,0.86); border: 1px solid #334155; }
+        .pos-cell { background: #1e293b; border-color: #334155; color: #e5e7eb; }
+        .pos-cell.server {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border-color: #fbbf24;
+            color: #fef3c7;
+            box-shadow: 0 0 0 2px rgba(251,191,36,0.35), 0 0 18px rgba(251,191,36,0.22);
+            position: relative;
+        }
+        .pos-cell.server::after {
+            content: 'S';
+            position: absolute;
+            top: 3px;
+            right: 4px;
+            background: #fbbf24;
+            color: #111827;
+            border-radius: 999px;
+            font-size: 0.58rem;
+            font-weight: 900;
+            line-height: 1;
+            padding: 3px 5px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+        }
+        .pos-cell.server .pos-num {
+            color: #ffffff !important;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.55);
+            font-size: 1.22rem;
+        }
+        .pos-cell.server .pos-name { color: #fde68a !important; }
+        .pos-num { color: #93c5fd; }
+        .pos-name { color: #cbd5e1; }
+
+        .player-grid-box, .panel, .active-player-panel, .start-lineup-box, .edit-panel, .archive-section {
+            background: rgba(15,23,42,0.92) !important;
+            border: 1px solid #334155 !important;
+            box-shadow: 0 10px 24px rgba(0,0,0,0.26) !important;
+            color: #e5e7eb;
+        }
+        .player-grid-box { margin-bottom: 12px; padding: 12px; }
+        .player-grid-box > span, .section-title, .active-player-title { color: #cbd5e1 !important; }
+        .player-buttons { gap: 7px; }
+        .p-btn {
+            background: #1e293b;
+            border-color: #334155;
+            color: #e5e7eb;
+        }
+        .p-btn.active { background: #2563eb !important; border-color: #60a5fa !important; color: #fff !important; box-shadow: 0 0 0 2px rgba(96,165,250,0.22), 0 0 12px rgba(37,99,235,0.45); }
+        .p-btn.opp-team-btn { background: #3f1d1d; border-color: #7f1d1d; color: #fecaca; }
+
+        .grid { gap: 12px; align-items: start; }
+        @media (min-width: 1024px) {
+            .grid { grid-template-columns: minmax(330px, 0.9fr) minmax(480px, 1.25fr); }
+            .grid > .panel:nth-child(3) { grid-column: 1 / -1; padding: 10px 14px; }
+            .grid > .panel:nth-child(3) h3 { display: none; }
+            .grid > .panel:nth-child(3) p { display: none; }
+            .main-action-strip { margin-top: 0; grid-template-columns: repeat(2, minmax(160px, 1fr)); max-width: 520px; margin-left: auto; margin-right: auto; }
+        }
+        @media (min-width: 768px) { .header-panel { gap: 12px; margin-bottom: 12px; } }
+
+        .stat-section { border-bottom-color: #334155; margin-bottom: 10px; padding-bottom: 8px; }
+        .btn { min-height: 44px; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.16); }
+        .btn-plus { background: linear-gradient(135deg, #047857, #10b981); }
+        .btn-minus { background: linear-gradient(135deg, #991b1b, #ef4444); }
+        .btn-warn { background: linear-gradient(135deg, #b45309, #f59e0b); color: #111827; }
+        .action-btn { background: #334155; border: 1px solid #475569; }
+
+        .log-container {
+            background: #020617;
+            border-color: #334155;
+            max-height: min(52vh, 520px);
+            min-height: 280px;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .grid > .panel:first-child { align-self: start; }
+        .grid > .panel:first-child .log-container { height: min(52vh, 520px); }
+        .log-item { background: #111827; border-left-color: #64748b; color: #e5e7eb; border: 1px solid #1f2937; border-left-width: 6px; }
+        .log-item.us { background: rgba(6,95,70,0.42); color: #d1fae5; border-left-color: #10b981; }
+        .log-item.them { background: rgba(127,29,29,0.42); color: #fee2e2; border-left-color: #ef4444; }
+        .log-item.timeout { background: rgba(120,53,15,0.5); color: #fde68a; border-left-color: #f59e0b; }
+        .log-item.substitution { background: rgba(88,28,135,0.45); color: #e9d5ff; border-left-color: #a78bfa; }
+        .log-item.score-adjust { background: rgba(14,165,233,0.18); color: #bae6fd; border-left-color: #38bdf8; }
+        .score-adjust-card { background: #1e293b; border-color: #334155; }
+        .score-adjust-card label { color:#bfdbfe; }
+        .score-adjust-input { background:#0f172a; color:#e5e7eb; border-color:#475569; }
+
+        .tabs { border-bottom-color: #334155; }
+        .tab { color: #94a3b8; }
+        .tab.active { color: #93c5fd; border-bottom-color: #60a5fa; }
+        .table-container { border-color: #334155; background: #020617; }
+        .stats-table th { background: #1e293b; color: #dbeafe; }
+        .stats-table th small { display:block; font-size:0.68rem; font-weight:700; color:#93c5fd; margin-top:2px; white-space:nowrap; }
+        .point-total { font-size:1.05rem; font-weight:900; color:#facc15; text-align:center; }
+        .stat-pair { display:flex; gap:8px; align-items:center; justify-content:flex-start; font-weight:900; white-space:nowrap; }
+        .stat-good, .stat-bad { display:inline-flex; align-items:center; justify-content:center; min-width:42px; padding:3px 6px; border-radius:999px; font-size:0.98rem; }
+        .stat-good { color:#dcfce7; background:rgba(34,197,94,0.18); border:1px solid rgba(34,197,94,0.35); }
+        .stat-bad { color:#fecaca; background:rgba(239,68,68,0.18); border:1px solid rgba(239,68,68,0.35); }
+        .stats-note { font-size:0.82rem; color:#bfdbfe; text-align:right; margin:4px 0 8px; font-weight:bold; }
+
+        .stats-table td, .stats-table th { border-bottom-color: #334155; color: #e5e7eb; }
+        .stats-table tr.opp-summary-row { background: rgba(239,68,68,0.12); }
+        .analysis-box { background: #0f172a; border-color: #334155; color: #e5e7eb; }
+        .analysis-title { color: #93c5fd; }
+        .ratio-bar { background: #334155; }
+
+        .modal-overlay { background: rgba(2,6,23,0.72); }
+        .modal-window { background: #0f172a; border-color: #334155; box-shadow: 0 24px 70px rgba(0,0,0,0.55); }
+        .modal-header { background: linear-gradient(135deg, #172554, #2563eb); border-bottom: 1px solid #334155; }
+        .modal-close { background: rgba(15,23,42,0.48); }
+        .modal-body { background: #0f172a; }
+        .history-scroll-box { background: #020617; color: #cbd5e1; border-color: #334155; }
+        .history-item { border-bottom-color: #334155; }
+        .archive-controls { background: #111827; border: 1px solid #334155; }
+        .archive-select, .edit-input input {
+            background: #020617;
+            color: #e5e7eb;
+            border-color: #475569;
+        }
+        /* 過去の記録モーダル内の配色漏れ対策 */
+        #archiveModal .archive-section,
+        #archiveModal .archive-layout,
+        #archiveModal #archive-display-area {
+            background: rgba(15,23,42,0.96) !important;
+            color: #e5e7eb !important;
+            border-color: #334155 !important;
+        }
+        #archiveModal #archive-display-area {
+            border-style: dashed !important;
+            box-shadow: inset 0 0 0 1px rgba(96,165,250,0.08);
+        }
+        #archiveModal #archive-view-title {
+            color: #93c5fd !important;
+            border-bottom-color: #334155 !important;
+        }
+        #archiveModal h4,
+        #archiveModal h5,
+        #archiveModal p,
+        #archiveModal span,
+        #archiveModal label {
+            color: #e5e7eb !important;
+        }
+        #archiveModal .archive-controls span,
+        #archiveModal h5 {
+            color: #cbd5e1 !important;
+        }
+        #archiveModal .table-container,
+        #archiveModal #archive-running-score-log {
+            background: #020617 !important;
+            border-color: #334155 !important;
+        }
+        #archiveModal .stats-table th { background: #1e293b !important; color: #dbeafe !important; }
+        #archiveModal .stats-table td { color: #e5e7eb !important; }
+        .start-cell { background: #111827; border-color: #334155; color: #e5e7eb; }
+        .start-cell:hover { background: #172554; border-color: #60a5fa; }
+        .start-label { color: #94a3b8; }
+        .start-num { color: #93c5fd; }
+        .start-name { color: #cbd5e1; }
+        .lineup-picker { background: #020617; border-color: #334155; }
+        .lineup-picker-title { color: #dbeafe; }
+        .lineup-player-btn { background: #111827; color: #e5e7eb; border-color: #334155; }
+        .lineup-player-btn:hover { background: #172554; border-color: #60a5fa; }
+        .lineup-player-btn.current { background: #1d4ed8; color: #fff; border-color: #93c5fd; }
+        .lineup-player-btn.used { background: rgba(245,158,11,0.26); border-color: #f59e0b; color: #fde68a; box-shadow: 0 0 0 2px rgba(245,158,11,0.2); }
+        .lineup-shift-btn { background: #1e293b; color: #e5e7eb; border-color: #475569; }
+        .lineup-shift-btn:hover { background: #172554; border-color: #60a5fa; }
+
+        /* 小さめタブレットでもクイック操作が枠外にはみ出さないようにする */
+        @media (max-width: 1023px) {
+            body { padding: 8px; }
+            .scoreboard { height: auto; min-height: 160px; padding: 10px 8px; }
+            .score-num { font-size: clamp(3rem, 10vw, 4.2rem); }
+            .grid { grid-template-columns: 1fr; }
+            .main-action-strip { grid-template-columns: 1fr 1fr; }
+            .log-container, .grid > .panel:first-child .log-container { height: 34vh; min-height: 230px; max-height: 420px; }
+        }
+        @media (max-width: 640px) {
+            .top-tool-dock { grid-template-columns: 1fr 1fr; }
+            .player-buttons { grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); }
+            .btn-group { grid-template-columns: 1fr 1fr; }
+            .main-action-strip { grid-template-columns: 1fr; }
+        }
+
+
+        /* ===== Ver.1.2.2 S-Lineup視認性調整＆リセットボタン移動 ===== */
+        .title-bar { justify-content: center; }
+        .title-bar h1 { padding-left: 0 !important; }
+        #lineupModal .modal-window { max-width: 980px; }
+        #lineupModal .modal-header h2 { font-size: 1.28rem; letter-spacing: 0.02em; }
+        #lineupModal .start-lineup-box { padding: 20px; }
+        #lineupModal .start-lineup-box h3 { font-size: 1.35rem; margin-bottom: 8px; }
+        #lineupModal .start-lineup-box p { font-size: 0.98rem !important; color: #cbd5e1 !important; margin-bottom: 16px !important; }
+        #lineupModal .start-grid { gap: 14px; margin-top: 14px; }
+        #lineupModal .start-cell {
+            min-height: 98px;
+            border-radius: 14px;
+            padding: 12px 8px;
+            border-width: 2px;
+        }
+        #lineupModal .start-label {
+            font-size: 0.78rem;
+            transform: none;
+            color: #bfdbfe;
+            margin-bottom: 7px;
+            letter-spacing: 0.02em;
+        }
+        #lineupModal .start-num {
+            font-size: 1.45rem;
+            line-height: 1.1;
+            color: #facc15;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.35);
+        }
+        #lineupModal .start-name {
+            font-size: 0.92rem;
+            transform: none;
+            max-width: 120px;
+            margin-top: 7px;
+            color: #e5e7eb;
+        }
+        #lineupModal .lineup-picker { padding: 16px; margin-top: 18px; border-radius: 16px; }
+        #lineupModal .lineup-picker-title { font-size: 1.08rem; margin-bottom: 14px; }
+        #lineupModal .lineup-player-buttons { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+        #lineupModal .lineup-player-btn { min-height: 58px; font-size: 0.98rem; border-radius: 12px; padding: 12px 8px; }
+        #lineupModal .lineup-shift-actions { margin: 18px 0 10px; }
+        #lineupModal .lineup-shift-btn { min-height: 56px; font-size: 1.08rem; border-radius: 14px; }
+        #lineupModal .lineup-cancel-btn { font-size: 0.98rem; padding: 11px 24px; }
+        .danger-zone-box {
+            margin-top: 18px;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(248,113,113,0.45);
+            background: rgba(127,29,29,0.22);
+            color: #fecaca;
+        }
+        .danger-zone-title { font-weight: 900; color: #fecaca; margin-bottom: 6px; }
+        .danger-zone-box p { margin: 0 0 10px 0; color: #fca5a5; font-size: 0.84rem; line-height: 1.6; }
+        .danger-reset-btn {
+            background: linear-gradient(135deg, #7f1d1d, #dc2626);
+            color: white;
+            border: 1px solid #fca5a5;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 6px 16px rgba(127,29,29,0.28);
+        }
+        @media (max-width: 640px) {
+            #lineupModal .start-grid { gap: 10px; }
+            #lineupModal .start-cell { min-height: 86px; padding: 10px 6px; }
+            #lineupModal .start-label { font-size: 0.68rem; }
+            #lineupModal .start-num { font-size: 1.22rem; }
+            #lineupModal .start-name { font-size: 0.78rem; max-width: 88px; }
+            #lineupModal .lineup-player-buttons { grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); }
+        }
+
+        /* ===== Ver.1.2.7 S-Lineupローテーション操作の実動修正 ===== */
+        #lineupModal .lineup-rotation-tool {
+            margin: 18px 0 12px;
+            padding: 14px;
+            border: 1px solid rgba(96,165,250,0.35);
+            background: rgba(15,23,42,0.72);
+            border-radius: 16px;
+        }
+        #lineupModal .lineup-rotation-title {
+            text-align: center;
+            font-weight: 900;
+            color: #dbeafe;
+            font-size: 1.02rem;
+            margin-bottom: 10px;
+        }
+        #lineupModal .lineup-shift-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            align-items: stretch;
+            margin: 0;
+        }
+        #lineupModal .lineup-shift-btn.forward {
+            border-color: rgba(52,211,153,0.75);
+            background: rgba(6,95,70,0.42);
+            color: #bbf7d0;
+        }
+        #lineupModal .lineup-shift-btn.back {
+            border-color: rgba(248,113,113,0.75);
+            background: rgba(127,29,29,0.42);
+            color: #fecaca;
+        }
+        #lineupModal .lineup-rotate-count {
+            min-width: 96px;
+            border-radius: 14px;
+            border: 2px solid #475569;
+            background: #020617;
+            color: #f8fafc;
+            font-weight: 900;
+            font-size: 1.05rem;
+            text-align: center;
+            padding: 0 12px;
+        }
+
+        #lineupModal .lineup-clear-btn {
+            width: 100%;
+            margin-top: 12px;
+            min-height: 50px;
+            border-radius: 14px;
+            border: 2px solid rgba(96,165,250,0.78);
+            background: linear-gradient(135deg, rgba(30,64,175,0.70), rgba(37,99,235,0.62));
+            color: #dbeafe;
+            font-weight: 900;
+            font-size: 1.02rem;
+            cursor: pointer;
+            box-shadow: 0 0 0 2px rgba(59,130,246,0.14), 0 8px 18px rgba(15,23,42,0.26);
+        }
+        #lineupModal .lineup-clear-btn:hover { background: linear-gradient(135deg, rgba(37,99,235,0.88), rgba(59,130,246,0.74)); border-color: #bfdbfe; color: #eff6ff; }
+        .lineup-used-badge {
+            display: inline-block;
+            margin-top: 4px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: rgba(245,158,11,0.95);
+            color: #111827;
+            font-size: 0.72rem;
+            font-weight: 900;
+        }
+
+        #lineupModal .lineup-rotate-status {
+            text-align: center;
+            color: #93c5fd;
+            font-size: 0.95rem;
+            font-weight: 800;
+            margin-top: 10px;
+            min-height: 1.3em;
+        }
+        @media (max-width: 640px) {
+            #lineupModal .lineup-shift-actions { grid-template-columns: 1fr; }
+            #lineupModal .lineup-rotate-count { min-height: 48px; width: 100%; }
+        }
+
+    
+
+        /* ===== Ver.1.2.11 iPad実機向けコンパクト調整 ===== */
+        body.compact-ready, body { padding: 6px; }
+        .container { max-width: 1180px; }
+        .title-bar { margin-bottom: 4px; }
+        .title-bar h1 { font-size: clamp(1.05rem, 2.2vw, 1.45rem); line-height: 1.1; }
+
+        .top-tool-dock { grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 6px; }
+        .tool-btn { padding: 8px 6px; font-size: 0.78rem; border-radius: 10px; min-height: 36px; }
+
+        .header-panel { gap: 8px !important; margin-bottom: 8px !important; }
+        .scoreboard { height: 132px; min-height: 132px; padding: 7px 10px; border-radius: 10px; }
+        .score-num { font-size: clamp(2.65rem, 5.8vw, 3.45rem); }
+        .set-info { font-size: 0.92rem; padding: 6px 8px; min-width: 66px; }
+        .set-info button { margin-top: 5px !important; padding: 3px 8px !important; font-size: 0.74rem !important; }
+        .team-score > div:first-child { font-size: 0.82rem !important; margin-bottom: 0 !important; }
+        .to-count { font-size: 0.68rem; }
+        .sub-panel-btns { margin-top: 2px; gap: 3px; }
+        .to-btn, .sub-btn { padding: 3px 6px; font-size: 0.68rem; border-radius: 5px; }
+        .scoreboard-left-setup { gap: 3px; }
+        .scoreboard-left-setup > span { font-size: 0.58rem !important; }
+        .side-btn { padding: 4px 9px; font-size: 0.7rem; }
+        .opp-name-input { width: 86px; font-size: 0.74rem; padding: 3px 5px; margin-bottom: 2px; }
+
+        .rotation-court { height: 132px; padding: 6px; padding-top: 21px; gap: 4px; border-radius: 10px; }
+        .court-title { font-size: 0.62rem; top: 3px; left: 5px; }
+        .pos-cell { border-radius: 5px; padding: 1px; }
+        .pos-num { font-size: 0.95rem; margin-bottom: 0; }
+        .pos-name { font-size: 0.58rem; max-width: 58px; }
+        .pos-cell.server .pos-num { font-size: 1.05rem; }
+        .pos-cell.server::after { font-size: 0.48rem; padding: 2px 4px; top: 2px; right: 3px; }
+
+        .player-grid-box { padding: 7px 9px !important; margin-bottom: 8px !important; border-radius: 10px; }
+        .player-grid-box > span { font-size: 0.76rem; }
+        .player-buttons { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 5px; margin-top: 6px; }
+        .p-btn { padding: 6px 4px; font-size: 0.72rem; border-radius: 6px; border-width: 1px; min-height: 32px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .p-btn.active { transform: none; }
+
+        .grid { gap: 8px; }
+        .panel { padding: 8px !important; border-radius: 10px; }
+        .panel h3 { font-size: 0.95rem; margin: 0 0 6px; }
+        .stat-section { margin-bottom: 6px !important; padding-bottom: 5px !important; }
+        .section-title { font-size: 0.78rem; margin-bottom: 4px; }
+        .btn-group { gap: 4px; }
+        .btn { min-height: 34px !important; padding: 6px 4px; font-size: 0.74rem; border-radius: 6px; }
+        .log-container { min-height: 190px !important; max-height: 310px !important; padding: 6px; }
+        .grid > .panel:first-child .log-container { height: 280px !important; }
+        .log-item { padding: 4px 6px; margin-bottom: 3px; font-size: 0.74rem; border-left-width: 5px; }
+        .main-action-strip { gap: 6px; }
+        .main-action-strip .action-btn, .action-btn { padding: 8px; font-size: 0.78rem; border-radius: 8px; }
+        .grid > .panel:nth-child(3) { padding: 6px 8px !important; }
+
+        @media (min-width: 900px) {
+            .header-panel { display: grid; grid-template-columns: 1.55fr 0.72fr; align-items: stretch; }
+            .grid { grid-template-columns: minmax(290px, 0.82fr) minmax(430px, 1.18fr); }
+            .grid > .panel:nth-child(3) { grid-column: 1 / -1; }
+        }
+
+        @media (max-width: 899px) {
+            .top-tool-dock { grid-template-columns: repeat(3, 1fr); }
+            .scoreboard { min-height: 138px; height: auto; }
+            .header-panel { gap: 6px !important; }
+            .player-buttons { grid-template-columns: repeat(auto-fill, minmax(79px, 1fr)); }
+            .grid > .panel:first-child .log-container { height: 210px !important; }
+        }
+
+        @media (orientation: landscape) and (max-height: 820px) {
+            .title-bar h1 { font-size: 1.02rem; }
+            .title-bar { margin-bottom: 3px; }
+            .top-tool-dock { margin-bottom: 5px; }
+            .scoreboard, .rotation-court { height: 122px; min-height: 122px; }
+            .score-num { font-size: clamp(2.45rem, 5vw, 3.15rem); }
+            .player-buttons { grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); }
+            .p-btn { min-height: 30px; font-size: 0.7rem; padding: 5px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .grid > .panel:first-child .log-container { height: 245px !important; }
+            .btn { min-height: 31px !important; padding: 5px 3px; }
+            .stat-section { margin-bottom: 4px !important; padding-bottom: 4px !important; }
+        }
+
+
+
+        /* Ver.1.2.16 fixed running score area and count alerts */
+        .running-score-area,
+        #running-score-log,
+        .grid > .panel:first-child .log-container {
+            height: 400px !important;
+            min-height: 400px !important;
+            max-height: 400px !important;
+            overflow-y: auto !important;
+            box-sizing: border-box !important;
+        }
+
+        .p-btn.opp-team-btn { grid-column: span 2 !important; }
+
+        .set-center-box { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; }
+        .set-info button[onclick="finishSet()"], #set-finish-btn { color: #ffffff !important; font-weight: 900 !important; text-shadow: 0 1px 2px rgba(0,0,0,0.55); }
+        #set-finish-btn.set-end-ready { background: linear-gradient(135deg, #16a34a, #22c55e) !important; color:#ffffff !important; box-shadow: 0 0 12px rgba(34,197,94,0.75); }
+        .score-adjust-under-btn { margin-top: 4px; min-width: 84px; }
+
+        .to-count .count-alert { color: #ef4444 !important; font-weight: 900 !important; text-shadow: 0 1px 2px rgba(0,0,0,0.45); }
+
+        /* ===== Ver.1.2.27 試合管理 ===== */
+        .match-context-mini {
+            font-size: 0.72rem;
+            color: #cbd5e1;
+            margin-bottom: 2px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+        .match-management-box {
+            background:#0f172a;
+            border:1px solid #334155;
+            border-radius:12px;
+            padding:14px;
+            color:#e5e7eb;
+        }
+        .match-management-box label {
+            display:block;
+            font-size:0.92rem;
+            color:#cbd5e1;
+            font-weight:800;
+            margin:10px 0 6px;
+        }
+        .match-type-row {
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+            margin-bottom:10px;
+        }
+        .match-type-btn {
+            flex:1;
+            min-width:150px;
+            padding:12px 14px;
+            border-radius:10px;
+            border:2px solid #475569;
+            background:#1e293b;
+            color:#e5e7eb;
+            font-weight:900;
+            cursor:pointer;
+            font-size:1rem;
+        }
+        .match-type-btn.active {
+            border-color:#60a5fa;
+            background:#1d4ed8;
+            color:#fff;
+            box-shadow:0 0 12px rgba(96,165,250,0.35);
+        }
+        .match-input {
+            width:100%;
+            box-sizing:border-box;
+            padding:11px;
+            border-radius:8px;
+            border:1px solid #475569;
+            background:#1e293b;
+            color:#f8fafc;
+            font-size:1rem;
+            font-weight:800;
+        }
+        .match-summary-box {
+            margin-top:12px;
+            padding:10px;
+            border-radius:10px;
+            background:#020617;
+            border:1px solid #334155;
+            color:#bfdbfe;
+            font-weight:800;
+            line-height:1.6;
+        }
+    
+
+        /* ===== Ver.1.2.28 メニューボタン1列表示：最小CSS上書き ===== */
+        .top-tool-dock {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            gap: 6px !important;
+            margin: 0 0 12px 0 !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        .top-tool-dock .tool-btn {
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+            white-space: nowrap !important;
+            padding: 9px 5px !important;
+            font-size: clamp(0.64rem, 1.05vw, 0.78rem) !important;
+            border-radius: 10px !important;
+            line-height: 1.15 !important;
+        }
+        @media (max-width: 800px) {
+            .top-tool-dock {
+                display: flex !important;
+                grid-template-columns: none !important;
+                flex-wrap: nowrap !important;
+            }
+            .top-tool-dock .tool-btn {
+                font-size: 0.66rem !important;
+                padding: 8px 4px !important;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="title-bar">
+        <h1 id="app-title-display">SEIMEI HS Volleyball Tracker</h1>
+    </div>
+
+
+    <div class="top-tool-dock">
+        <button class="tool-btn" onclick="openModal('matchModal')">🏐 試合管理</button>
+        <button class="tool-btn" onclick="openModal('lineupModal')">📋 S-Lineup</button>
+        <button class="tool-btn" onclick="openModal('historyModal')">📜 セット履歴</button>
+        <button class="tool-btn" onclick="openModal('statsModal')">📊 集計・分析</button>
+        <button class="tool-btn" onclick="openModal('archiveModal')">📂 過去の記録</button>
+        <button class="tool-btn" onclick="openModal('playersModal')">👥 基礎データ管理</button>
+        <button class="tool-btn" onclick="openModal('dataModal')">💾 保存・読込</button>
+    </div>
+
+    <div class="header-panel">
+        <div class="scoreboard-box">
+            <div class="scoreboard">
+                <div class="scoreboard-left-setup">
+                    <span style="font-size:0.65rem; color:rgba(255,255,255,0.8); font-weight:bold;">セット開始時</span>
+                    <div class="start-side-toggle">
+                        <button id="side-s-btn" class="side-btn active" onclick="setStartSide('S')">Ｓ</button>
+                        <button id="side-r-btn" class="side-btn" onclick="setStartSide('R')">Ｒ</button>
+                    </div>
+                </div>
+
+                <div class="team-score">
+                    <div id="self-team-name-display" style="font-size:0.95rem; font-weight: bold; letter-spacing: 2px; margin-bottom: 2px;">清明</div>
+                    <div class="score-num" id="score-us">0</div>
+                    <div class="to-count">T.O: <span id="to-us-count">0</span>/2 | 交代: <span id="sub-us-count">0</span>/6</div>
+                    <div class="sub-panel-btns">
+                        <button class="to-btn" onclick="recordTimeout('us')">⏳ T.O</button>
+                        <button class="sub-btn" onclick="recordSubstitution('us')">🔄 交代</button>
+                    </div>
+                </div>
+
+                <div class="set-center-box">
+                    <div class="set-info">
+                        <div id="match-context-display" class="match-context-mini">練習試合</div>
+                        第 <span id="current-set-num">1</span> S<br>
+                        <button id="set-finish-btn" class="btn-plus" style="margin-top:8px; padding:4px 10px; font-size:0.8rem; border:none; border-radius:4px; cursor: pointer;" onclick="finishSet()">セット終了</button>
+                    </div>
+                    <button class="score-adjust-btn score-adjust-under-btn" onclick="openScoreAdjustModal()">得点修正</button>
+                </div>
+
+                <div class="team-score">
+                    <input type="text" id="opp-team-name-input" class="opp-name-input" value="相手" oninput="updateOppName(this.value)">
+                    <div class="score-num" id="score-them">0</div>
+                    <div class="to-count">T.O: <span id="to-them-count">0</span>/2 | 交代: <span id="sub-them-count">0</span>/6</div>
+                    <div class="sub-panel-btns">
+                        <button class="to-btn" onclick="recordTimeout('them')">⏳ T.O</button>
+                        <button class="sub-btn" onclick="recordSubstitution('them')">🔄 交代</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="rotation-panel-box">
+            <div class="rotation-court" id="court-board">
+                <div class="court-title">🔄 ローテ位置</div>
+                <div class="pos-cell" id="pos-p4"><span class="pos-num" id="num-p4">-</span><span class="pos-name" id="name-p4">-</span></div>
+                <div class="pos-cell" id="pos-p3"><span class="pos-num" id="num-p3">-</span><span class="pos-name" id="name-p3">-</span></div>
+                <div class="pos-cell" id="pos-p2"><span class="pos-num" id="num-p2">-</span><span class="pos-name" id="name-p2">-</span></div>
+                <div class="pos-cell" id="pos-p5"><span class="pos-num" id="num-p5">-</span><span class="pos-name" id="name-p5">-</span></div>
+                <div class="pos-cell" id="pos-p6"><span class="pos-num" id="num-p6">-</span><span class="pos-name" id="name-p6">-</span></div>
+                <div class="pos-cell" id="pos-p1"><span class="pos-num" id="num-p1">-</span><span class="pos-name" id="name-p1">-</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="player-grid-box">
+        <span style="font-weight:bold; color:#4b5563;">👇 入力対象</span>
+        <div class="player-buttons" id="player-btn-container"></div>
+    </div>
+
+    <div class="grid">
+        <div class="panel">
+            <h3>ランニングスコア</h3>
+            <div class="log-container running-score-area" id="running-score-log"></div>
+        </div>
+
+        <div class="panel">
+            <h3>スタッツ入力</h3>
+            <div class="stat-section">
+                <span class="section-title">スパイク</span>
+                <div class="btn-group">
+                    <button class="btn btn-plus" onclick="addStat('attack_kill')">得点</button>
+                    <button class="btn btn-minus" onclick="addStat('attack_error')">ミス</button>
+                </div>
+            </div>
+            <div class="stat-section">
+                <span class="section-title">ブロック</span>
+                <div class="btn-group">
+                    <button class="btn btn-plus" onclick="addStat('block_kill')">決定</button>
+                    <button class="btn btn-minus" onclick="addStat('block_error')">ミス</button>
+                </div>
+            </div>
+            <div class="stat-section">
+                <span class="section-title">サーブ</span>
+                <div class="btn-group">
+                    <button class="btn btn-plus" onclick="addStat('serve_ace')">エース</button>
+                    <button class="btn btn-minus" onclick="addStat('serve_error')">ミス</button>
+                </div>
+            </div>
+            <div class="stat-section">
+                <span class="section-title">ボールコントロールミス</span>
+                <div class="btn-group">
+                    <button class="btn btn-minus" onclick="addStat('reception_error')">レセプション</button>
+                    <button class="btn btn-minus" onclick="addStat('dig_error')">ディグ</button>
+                    <button class="btn btn-minus" onclick="addStat('toss_error')">トスミス</button>
+                    <button class="btn btn-minus" onclick="addStat('other_error')">その他</button>
+                </div>
+            </div>
+            
+            <div class="stat-section">
+                <span class="section-title">反則</span>
+                <div class="btn-group">
+                    <button class="btn btn-warn" onclick="addStat('v_net')">タッチネット</button>
+                    <button class="btn btn-warn" onclick="addStat('v_over')">オーバーネット</button>
+                    <button class="btn btn-warn" onclick="addStat('v_passing')">パッシング</button>
+                    <button class="btn btn-warn" onclick="addStat('v_dribble')">ドリブル</button>
+                    <button class="btn btn-warn" onclick="addStat('v_hold')">ホールディング</button>
+                    <button class="btn btn-warn" onclick="addStat('v_positional')">ポジショナルＦ</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>クイック操作</h3>
+            <p style="font-size:0.85rem; color:#4b5563; text-align:center; margin:6px 0 10px;">試合中によく使う操作だけを残しています。</p>
+            <div class="main-action-strip">
+                <button class="action-btn" onclick="undoLast()">↩ 1つ取消</button>
+                <button class="action-btn" onclick="openModal('statsModal')">📊 集計確認</button>
+            </div>
+        </div>
+    </div>
+
+
+
+    <div class="modal-overlay" id="matchModal" onclick="closeModalOnBackdrop(event, 'matchModal')">
+        <div class="modal-window" style="max-width:720px;">
+            <div class="modal-header"><h2>🏐 試合管理</h2><button class="modal-close" onclick="closeModal('matchModal')">閉じる</button></div>
+            <div class="modal-body">
+                <div class="match-management-box">
+                    <label>試合区分</label>
+                    <div class="match-type-row">
+                        <button id="match-type-official-btn" class="match-type-btn" type="button" onclick="setMatchTypeUI('official')">公式戦</button>
+                        <button id="match-type-practice-btn" class="match-type-btn" type="button" onclick="setMatchTypeUI('practice')">練習試合</button>
+                    </div>
+
+                    <div id="official-match-settings">
+                        <label>公式戦の試合番号</label>
+                        <input id="official-match-number-input" class="match-input" type="number" min="1" step="1" value="1">
+                        <p style="font-size:0.82rem;color:#94a3b8;line-height:1.6;margin:8px 0 0;">※「適用」を押して試合番号が変わると、セット数は第1セットに戻ります。</p>
+                    </div>
+
+                    <div id="practice-match-settings">
+                        <label>練習試合の日付管理</label>
+                        <div class="match-summary-box" id="practice-date-summary">本日の日付で管理します。</div>
+                        <p style="font-size:0.82rem;color:#94a3b8;line-height:1.6;margin:8px 0 0;">※練習試合では同日内はセット数を積み上げ、日付が変わった場合は第1セットから始めます。</p>
+                    </div>
+
+                    <div class="match-summary-box" id="match-management-summary">現在の設定を表示します。</div>
+                    <div class="footer-btns" style="margin-top:12px;">
+                        <button class="action-btn btn-plus" type="button" onclick="applyMatchSettings()">適用</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="statsModal" onclick="closeModalOnBackdrop(event, 'statsModal')">
+        <div class="modal-window">
+            <div class="modal-header"><h2>📊 集計・分析</h2><button class="modal-close" onclick="closeModal('statsModal')">閉じる</button></div>
+            <div class="modal-body">
+        <div class="panel">
+            <h3>集計</h3>
+            <div class="tabs">
+                <div class="tab active" id="tab-set" onclick="switchView('set')">現セット</div>
+                <div class="tab" id="tab-today" onclick="switchView('today')">本日通算</div>
+                <div class="tab" id="tab-all" onclick="switchView('all')">全通算</div>
+            </div>
+            <div class="stats-note">※ ○＝得点・決定　×＝ミス　／　得点順で表示</div>
+            <div class="table-container">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>選手名</th>
+                            <th>得点</th>
+                            <th>スパイク<br><small>○得点 ×ミス</small></th>
+                            <th>ブロック<br><small>○決定 ×ミス</small></th>
+                            <th>サーブ<br><small>○エース ×ミス</small></th>
+                            <th>ミス</th>
+                            <th>反則</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stats-tbody"></tbody>
+                </table>
+            </div>
+
+            <div class="analysis-box">
+                <div class="analysis-title">📈 得点割合分析 (選択中タブの集計)</div>
+                
+                <div class="ratio-bar-container">
+                    <div class="ratio-bar-labels">
+                        <span style="color:var(--primary);"><span class="self-team-text-label">清明</span>の得点内訳</span>
+                        <span id="analysis-us-summary">0点 (自力 0% : 相手ミス 0%)</span>
+                    </div>
+                    <div class="ratio-bar">
+                        <div id="bar-us-own" class="ratio-fill-own" style="width: 0%;"></div>
+                        <div id="bar-us-opp-err" class="ratio-fill-opp-err" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <div class="ratio-bar-container" style="margin-top:10px;">
+                    <div class="ratio-bar-labels">
+                        <span style="color:var(--danger);"><span class="opp-team-text-label">相手</span>の得点内訳</span>
+                        <span id="analysis-them-summary">0点 (自力 0% : <span class="self-team-text-label">清明</span>ミス 0%)</span>
+                    </div>
+                    <div class="ratio-bar">
+                        <div id="bar-them-opp" class="ratio-fill-opp" style="width: 0%;"></div>
+                        <div id="bar-them-own-err" class="ratio-fill-own-err" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-btns">
+                <button class="action-btn csv-btn" onclick="exportActiveStatsCSV()">CSV出力</button>
+                <button class="action-btn print-btn" onclick="openPrintView()">印刷/PDF</button>
+            </div>
+        </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="historyModal" onclick="closeModalOnBackdrop(event, 'historyModal')">
+        <div class="modal-window">
+            <div class="modal-header"><h2>📜 本日のセット履歴</h2><button class="modal-close" onclick="closeModal('historyModal')">閉じる</button></div>
+            <div class="modal-body">
+        <div class="history-panel-box">
+            <div class="active-player-panel">
+                <div class="active-player-title">今日のセット履歴 📜</div>
+                <div class="history-scroll-box" id="set-history-display"></div>
+            </div>
+        </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="lineupModal" onclick="closeModalOnBackdrop(event, 'lineupModal')">
+        <div class="modal-window">
+            <div class="modal-header"><h2>📋 S-Lineup</h2><button class="modal-close" onclick="closeModal('lineupModal')">閉じる</button></div>
+            <div class="modal-body">
+        <div class="start-lineup-box">
+            <h3>📋 S-Lineup</h3>
+            <p style="font-size: 0.75rem; color: #6b7280; margin: 0 0 10px 0; text-align: center;">スターティング配置（ポジションをタップして選手を選択）</p>
+            <div class="start-grid">
+                <div class="start-cell" onclick="changeStartingPlayer(4)"><span class="start-label">FL (P4)</span><span class="start-num" id="start-num-4">-</span><span class="start-name" id="start-name-4">-</span></div>
+                <div class="start-cell" onclick="changeStartingPlayer(3)"><span class="start-label">FC (P3)</span><span class="start-num" id="start-num-3">-</span><span class="start-name" id="start-name-3">-</span></div>
+                <div class="start-cell" onclick="changeStartingPlayer(2)"><span class="start-label">FR (P2)</span><span class="start-num" id="start-num-2">-</span><span class="start-name" id="start-name-2">-</span></div>
+                <div class="start-cell" onclick="changeStartingPlayer(5)"><span class="start-label">BL (P5)</span><span class="start-num" id="start-num-5">-</span><span class="start-name" id="start-name-5">-</span></div>
+                <div class="start-cell" onclick="changeStartingPlayer(6)"><span class="start-label">BC (P6)</span><span class="start-num" id="start-num-6">-</span><span class="start-name" id="start-name-6">-</span></div>
+                <div class="start-cell" onclick="changeStartingPlayer(1)"><span class="start-label">BR (P1)</span><span class="start-num" id="start-num-1">-</span><span class="start-name" id="start-name-1">-</span></div>
+            </div>
+            <div class="lineup-rotation-tool">
+                <div class="lineup-rotation-title"></div>
+                <div class="lineup-shift-actions">
+                    <button class="lineup-shift-btn back" type="button" onclick="rotateStartingLineupBy(-1)">↶ 1つ戻す</button>
+                    <button class="lineup-shift-btn forward" type="button" onclick="rotateStartingLineupBy(1)">1つ進める ↷</button>
+                </div>
+                <button class="lineup-clear-btn" type="button" onclick="clearStartingLineup()">6か所とも消去</button>
+                <div id="lineup-rotate-status" class="lineup-rotate-status"></div>
+            </div>
+            <p style="font-size: 0.9rem; color: #94a3b8; margin: 0 0 8px 0; text-align: center;">前セットの配置を引き継いだまま、必要に応じてローテーション調整できます。</p>
+            <div class="lineup-picker" id="lineup-player-picker">
+                <div class="lineup-picker-title" id="lineup-picker-title">選手を選択</div>
+                <div class="lineup-player-buttons" id="lineup-player-buttons"></div>
+                <div class="lineup-picker-actions">
+                    <button class="lineup-cancel-btn" onclick="closeLineupPlayerPicker()">キャンセル</button>
+                </div>
+            </div>
+        </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="playersModal" onclick="closeModalOnBackdrop(event, 'playersModal')">
+        <div class="modal-window">
+            <div class="modal-header"><h2>👥 基礎データ管理</h2><button class="modal-close" onclick="closeModal('playersModal')">閉じる</button></div>
+            <div class="modal-body">
+        <div class="edit-panel">
+            <h2>チーム表示設定</h2>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:12px;margin-bottom:14px;">
+                <label style="display:block;font-size:0.9rem;color:#cbd5e1;font-weight:bold;margin-bottom:6px;">タイトル先頭部分</label>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                    <input type="text" id="app-title-prefix-input" class="base-data-input" value="SEIMEI HS" oninput="updateBaseDataSettings()" style="flex:1;min-width:220px;padding:10px;border-radius:8px;border:1px solid #475569;background:#1e293b;color:#f8fafc;font-size:1rem;">
+                    <span style="color:#94a3b8;font-weight:bold;">Volleyball Tracker</span>
+                </div>
+                <label style="display:block;font-size:0.9rem;color:#cbd5e1;font-weight:bold;margin-bottom:6px;">自チーム名（得点表示・帳票表示）</label>
+                <input type="text" id="self-team-name-input" class="base-data-input" value="清明" oninput="updateBaseDataSettings()" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #475569;background:#1e293b;color:#f8fafc;font-size:1rem;">
+                <p style="font-size:0.78rem;color:#94a3b8;margin:8px 0 0;">※変更内容は自動保存されます。タイトルは「入力値 + Volleyball Tracker」として表示されます。</p>
+            </div>
+            <h2>選手データ管理（背番号・氏名）</h2><p style="font-size:0.82rem;color:#94a3b8;margin-top:-4px;">※スタッツは内部IDで集計されます。背番号や氏名を変えても同じ登録枠の選手として扱われます。</p>
+            <div class="edit-grid" id="edit-inputs-container"></div>
+        </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="dataModal" onclick="closeModalOnBackdrop(event, 'dataModal')">
+        <div class="modal-window" style="max-width:760px;">
+            <div class="modal-header"><h2>💾 データ保存・読み込み</h2><button class="modal-close" onclick="closeModal('dataModal')">閉じる</button></div>
+            <div class="modal-body">
+                <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:10px;margin-bottom:12px;color:#cbd5e1;font-size:0.85rem;">📱 PWA対応版です。AndroidはChrome、iPadはSafariで開き、ホーム画面に追加するとアプリ風に使えます。</div>
+                <div class="panel">
+                    <h3>外部ファイルへバックアップ</h3>
+                    <p style="font-size:0.85rem; color:#cbd5e1; line-height:1.7;">現在の試合データ、選手名、S-Lineup、本日履歴、過去の記録をまとめて外部ファイルに保存できます。JSON単体に加えて、CSVや説明書を含むZIP一括保存にも対応しました。</p>
+                    <div class="footer-btns" style="margin-top:12px; flex-wrap:wrap;">
+                        <button class="action-btn export-btn" onclick="exportAppDataJSON()">💾 JSON保存</button>
+                        <button class="action-btn export-btn" onclick="exportAppDataZIP()">🗜️ ZIP一括保存</button>
+                        <button class="action-btn csv-btn" onclick="document.getElementById('app-data-import-file').click()">📂 読み込み</button>
+                    </div>
+                    <input type="file" id="app-data-import-file" accept="application/json,.json,.zip,application/zip" style="display:none" onchange="importAppDataFile(event)">
+                    <div class="backup-status-box">
+                        <strong>自動バックアップ</strong><br>
+                        セット終了時に、ブラウザ内へ自動バックアップを残します。<br>
+                        保存件数：<span id="auto-backup-count">0</span>件
+                        <div class="backup-list" id="auto-backup-list"><div style="color:#64748b;text-align:center;">バックアップなし</div></div>
+                    </div>
+                    <div class="danger-zone-box">
+                        <div class="danger-zone-title">⚠️ リセット操作</div>
+                        <p>通常は使いません。大会終了後や動作確認用に、すべての記録を初期化したい場合だけ実行してください。</p>
+                        <button class="danger-reset-btn" onclick="resetAll()">全リセット</button>
+                    </div>
+                    <p style="font-size:0.78rem; color:#94a3b8; margin-top:12px;">※読み込みを行うと、現在ブラウザ内にあるデータは読み込んだファイルの内容で上書きされます。大会前後はZIP一括保存がおすすめです。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="scoreAdjustModal" onclick="closeModalOnBackdrop(event, 'scoreAdjustModal')">
+        <div class="modal-window" style="max-width:720px;">
+            <div class="modal-header"><h2>⚙ 得点修正</h2><button class="modal-close" onclick="closeModal('scoreAdjustModal')">閉じる</button></div>
+            <div class="modal-body">
+                <p class="choice-subtitle">公式得点や判定変更に合わせて、現在の得点表示だけを補正します。修正履歴はランニングスコアに残ります。</p>
+                <div id="score-adjust-before" style="font-weight:900; text-align:center; margin: 8px 0 12px; color:#e5e7eb;"></div>
+                <div class="score-adjust-grid">
+                    <div class="score-adjust-card">
+                        <label id="score-adjust-us-label">自チーム</label>
+                        <input type="number" min="0" class="score-adjust-input" id="score-adjust-us" value="0">
+                        <div class="score-adjust-controls">
+                            <button class="score-adjust-minus" onclick="stepScoreAdjust('us', -1)">−1</button>
+                            <button class="score-adjust-plus" onclick="stepScoreAdjust('us', 1)">＋1</button>
+                        </div>
+                    </div>
+                    <div class="score-adjust-card">
+                        <label id="score-adjust-them-label">相手</label>
+                        <input type="number" min="0" class="score-adjust-input" id="score-adjust-them" value="0">
+                        <div class="score-adjust-controls">
+                            <button class="score-adjust-minus" onclick="stepScoreAdjust('them', -1)">−1</button>
+                            <button class="score-adjust-plus" onclick="stepScoreAdjust('them', 1)">＋1</button>
+                        </div>
+                    </div>
+                </div>
+                <label style="font-weight:bold; color:#cbd5e1;">メモ任意</label>
+                <input type="text" id="score-adjust-note" placeholder="例：判定訂正、記録ミス補正" style="width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid #475569; background:#0f172a; color:#e5e7eb; margin:6px 0 14px;">
+                <div class="footer-btns">
+                    <button class="action-btn" style="background:#0ea5e9;" onclick="applyScoreAdjustment()">得点修正を適用</button>
+                    <button class="action-btn" onclick="closeModal('scoreAdjustModal')">キャンセル</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="choiceModal" onclick="closeModalOnBackdrop(event, 'choiceModal')">
+        <div class="modal-window choice-modal-window">
+            <div class="modal-header"><h2 id="choice-modal-title">選択</h2><button class="modal-close" onclick="closeChoiceModal()">閉じる</button></div>
+            <div class="modal-body">
+                <p class="choice-subtitle" id="choice-modal-subtitle"></p>
+                <div id="choice-modal-extra"></div>
+                <div class="choice-grid" id="choice-modal-options"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="archiveModal" onclick="closeModalOnBackdrop(event, 'archiveModal')">
+        <div class="modal-window">
+            <div class="modal-header"><h2>📂 過去の記録</h2><button class="modal-close" onclick="closeModal('archiveModal')">閉じる</button></div>
+            <div class="modal-body">
+    <div class="archive-section">
+        <h3>📂 過去の記録（アーカイブ閲覧）</h3>
+        <p style="font-size: 0.8rem; color: #4b5563; margin-top:0;">日付を絞り込んで、1セットごとの詳細や1日合計データを閲覧できます。</p>
+        <div class="archive-controls">
+            <div>
+                <span style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">① 対象の日付を選択</span>
+                <select id="archive-day-select" class="archive-select" onchange="onArchiveDayChanged()">
+                    <option value="">日付を選択...</option>
+                </select>
+            </div>
+            <div>
+                <span style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">② 1セットごとに確認（日付内）</span>
+                <select id="archive-set-select" class="archive-select" onchange="viewArchiveSetItem()" disabled>
+                    <option value="">まず日付を選んでください</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:10px; align-items:flex-end;">
+                <button class="archive-btn" style="background-color:#059669;" id="archive-day-total-btn" onclick="viewArchiveDayTotal()" disabled>📅 この日の合計データを見る</button>
+                <button class="archive-btn csv-btn" onclick="exportArchiveDayCSV()">CSV出力</button>
+                <button class="archive-btn print-btn" onclick="openArchivePrintView()">印刷/PDF</button>
+            </div>
+            <div style="display:flex; align-items:flex-end; margin-left:auto;">
+                <button class="archive-btn danger" onclick="clearArchive()">📁 アーカイブ全削除</button>
+            </div>
+        </div>
+        
+        <div id="archive-display-area" style="display:none; border: 2px dashed #93c5fd; background:#f0f9ff; padding:15px; border-radius:8px;">
+            <h4 id="archive-view-title" style="margin-top:0; color:var(--primary); font-size:1.1rem; border-bottom:2px solid #93c5fd; padding-bottom:5px;">閲覧中のデータ</h4>
+            
+            <div class="archive-layout">
+                <div>
+                    <h5 style="margin: 5px 0; color: var(--dark);">📊 スタッツ集計</h5>
+                    <div class="stats-note">※ ○＝得点・決定　×＝ミス　／　得点順で表示</div>
+                    <div class="table-container" style="background:white;">
+                        <table class="stats-table">
+                            <thead>
+                                <tr>
+                                    <th>選手名</th>
+                                    <th>得点</th>
+                                    <th>スパイク<br><small>○得点 ×ミス</small></th>
+                                    <th>ブロック<br><small>○決定 ×ミス</small></th>
+                                    <th>サーブ<br><small>○エース ×ミス</small></th>
+                                    <th>ミス</th>
+                                    <th>反則</th>
+                                </tr>
+                            </thead>
+                            <tbody id="archive-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div>
+                    <h5 style="margin: 5px 0; color: var(--dark);" id="archive-log-title">📝 ランニングスコア</h5>
+                    <div class="log-container" id="archive-running-score-log" style="max-height: 400px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+            </div>
+        </div>
+    </div>
+
+<script>
+
+    function openModal(id) {
+        var modal = document.getElementById(id);
+        if (!modal) return;
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        updateUI();
+    }
+
+    function closeModal(id) {
+        var modal = document.getElementById(id);
+        if (!modal) return;
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    function closeModalOnBackdrop(event, id) {
+        if (event.target && event.target.id === id) closeModal(id);
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            var modals = document.getElementsByClassName('modal-overlay');
+            for (var i = 0; i < modals.length; i++) modals[i].classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    });
+
+    var players = [];
+    for (var i = 1; i <= 20; i++) { players.push('p' + i); }
+    players.push('team');
+
+    var playerNames = {};
+    for (var i = 1; i <= 20; i++) { playerNames['p' + i] = '選手 No.' + i; }
+    playerNames['team'] = '相手チーム(全体)';
+
+    // 内部ID(p1〜p20)は固定し、氏名と背番号は別管理にします。
+    // これにより、背番号や氏名表記を変更してもスタッツは同じ選手IDに紐づきます。
+    var playerNumbers = {};
+    for (var i = 1; i <= 20; i++) { playerNumbers['p' + i] = String(i); }
+
+    function normalizePlayerNumbers(map) {
+        var normalized = {};
+        for (var i = 1; i <= 20; i++) {
+            var id = 'p' + i;
+            normalized[id] = map && map[id] !== undefined && map[id] !== null && String(map[id]).trim() !== '' ? String(map[id]).trim() : String(i);
+        }
+        return normalized;
+    }
+
+    function getPlayerNumber(id, numberMap) {
+        if (id === 'team') return '';
+        var map = numberMap || playerNumbers || {};
+        var fallback = String(id || '').replace('p','');
+        return map[id] !== undefined && map[id] !== null && String(map[id]).trim() !== '' ? String(map[id]).trim() : fallback;
+    }
+
+    function getPlayerNameOnly(id, nameMap) {
+        var map = nameMap || playerNames || {};
+        if (id === 'team') return map[id] || playerNames[id] || '相手チーム(全体)';
+        return map[id] || playerNames[id] || ('選手 No.' + String(id || '').replace('p',''));
+    }
+
+    function getPlayerDisplayName(id, nameMap, numberMap) {
+        if (id === 'team') return getPlayerNameOnly(id, nameMap);
+        return getPlayerNumber(id, numberMap) + ' ' + getPlayerNameOnly(id, nameMap);
+    }
+
+    function updatePlayerButtonLabel(id) {
+        var btn = document.getElementById('btn-' + id);
+        if (!btn) return;
+        btn.innerText = id === 'team' ? playerNames[id] : getPlayerDisplayName(id);
+    }
+
+    var appTitlePrefix = 'SEIMEI HS';
+    var selfTeamName = '清明';
+    var oppTeamName = '相手';
+    var selectedPlayer = 'p1';
+    var matchType = 'practice';
+    var officialMatchNumber = 1;
+    var matchDateKey = '';
+    var currentSet = 1;
+    var historyLog = []; 
+    var timeoutCount = { us: 0, them: 0 };
+    var subCount = { us: 0, them: 0 };
+    var setResults = [];
+    var globalArchive = []; 
+    var autoBackups = []; 
+
+    var startingLineup = { 1: 'p1', 2: 'p2', 3: 'p3', 4: 'p4', 5: 'p5', 6: 'p6' };
+    var startSideSetting = 'S'; 
+    var hasServeAuthority = true; 
+
+    function createEmptyStats() {
+        var obj = {};
+        for (var k = 0; k < players.length; k++) {
+            obj[players[k]] = {
+                attack_kill: 0, attack_error: 0, block_kill: 0, block_error: 0,
+                serve_ace: 0, serve_error: 0, reception_error: 0, dig_error: 0, toss_error: 0, other_error: 0,
+                v_dribble: 0, v_net: 0, v_over: 0, v_passing: 0, v_positional: 0, v_hold: 0
+            };
+        }
+        return obj;
+    }
+
+    var setData = createEmptyStats();
+    var todayData = createEmptyStats();
+    var allData = createEmptyStats();
+    var currentView = 'set';
+
+    function loadStorage() {
+        if (localStorage.getItem('vball_currentSet_s')) {
+            currentSet = parseInt(localStorage.getItem('vball_currentSet_s'));
+            historyLog = JSON.parse(localStorage.getItem('vball_historyLog_s'));
+            timeoutCount = JSON.parse(localStorage.getItem('vball_timeoutCount_s'));
+            subCount = JSON.parse(localStorage.getItem('vball_subCount_s')) || { us: 0, them: 0 };
+            setResults = JSON.parse(localStorage.getItem('vball_setResults_s')) || [];
+            playerNames = JSON.parse(localStorage.getItem('vball_playerNames_s'));
+            playerNumbers = normalizePlayerNumbers(JSON.parse(localStorage.getItem('vball_playerNumbers_s') || 'null'));
+            setData = JSON.parse(localStorage.getItem('vball_setData_s'));
+            todayData = JSON.parse(localStorage.getItem('vball_todayData_s'));
+            allData = JSON.parse(localStorage.getItem('vball_allData_s'));
+            selectedPlayer = localStorage.getItem('vball_selectedPlayer_s') || 'p1';
+            startingLineup = JSON.parse(localStorage.getItem('vball_startingLineup_s')) || { 1: 'p1', 2: 'p2', 3: 'p3', 4: 'p4', 5: 'p5', 6: 'p6' };
+            startSideSetting = localStorage.getItem('vball_startSideSetting_s') || 'S';
+            hasServeAuthority = localStorage.getItem('vball_hasServeAuthority_s') !== 'false';
+            oppTeamName = localStorage.getItem('vball_oppTeamName_s') || '相手';
+            appTitlePrefix = localStorage.getItem('vball_appTitlePrefix_s') || appTitlePrefix;
+            selfTeamName = localStorage.getItem('vball_selfTeamName_s') || selfTeamName;
+            matchType = localStorage.getItem('vball_matchType_s') || matchType;
+            officialMatchNumber = parseInt(localStorage.getItem('vball_officialMatchNumber_s') || officialMatchNumber, 10) || 1;
+            matchDateKey = localStorage.getItem('vball_matchDateKey_s') || matchDateKey;
+        }
+        playerNumbers = normalizePlayerNumbers(playerNumbers);
+        globalArchive = JSON.parse(localStorage.getItem('vball_globalArchive_s')) || [];
+        autoBackups = JSON.parse(localStorage.getItem('vball_autoBackups_s')) || [];
+        normalizeMatchManagementOnLoad();
+    }
+
+    function saveStorage() {
+        localStorage.setItem('vball_currentSet_s', currentSet);
+        localStorage.setItem('vball_historyLog_s', JSON.stringify(historyLog));
+        localStorage.setItem('vball_timeoutCount_s', JSON.stringify(timeoutCount));
+        localStorage.setItem('vball_subCount_s', JSON.stringify(subCount));
+        localStorage.setItem('vball_setResults_s', JSON.stringify(setResults));
+        localStorage.setItem('vball_playerNames_s', JSON.stringify(playerNames));
+        localStorage.setItem('vball_playerNumbers_s', JSON.stringify(playerNumbers));
+        localStorage.setItem('vball_setData_s', JSON.stringify(setData));
+        localStorage.setItem('vball_todayData_s', JSON.stringify(todayData));
+        localStorage.setItem('vball_allData_s', JSON.stringify(allData));
+        localStorage.setItem('vball_selectedPlayer_s', selectedPlayer);
+        localStorage.setItem('vball_startingLineup_s', JSON.stringify(startingLineup));
+        localStorage.setItem('vball_startSideSetting_s', startSideSetting);
+        localStorage.setItem('vball_hasServeAuthority_s', hasServeAuthority);
+        localStorage.setItem('vball_oppTeamName_s', oppTeamName);
+        localStorage.setItem('vball_appTitlePrefix_s', appTitlePrefix);
+        localStorage.setItem('vball_selfTeamName_s', selfTeamName);
+        localStorage.setItem('vball_matchType_s', matchType);
+        localStorage.setItem('vball_officialMatchNumber_s', officialMatchNumber);
+        localStorage.setItem('vball_matchDateKey_s', matchDateKey);
+        localStorage.setItem('vball_globalArchive_s', JSON.stringify(globalArchive));
+        localStorage.setItem('vball_autoBackups_s', JSON.stringify(autoBackups));
+        updateAutoBackupUI();
+    }
+
+    function getTodayKey() {
+        var now = new Date();
+        return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    }
+
+    function getMatchLabel() {
+        if (matchType === 'official') return '公式戦 第' + officialMatchNumber + '試合';
+        return '練習試合';
+    }
+
+    function normalizeMatchManagementOnLoad() {
+        if (matchType !== 'official' && matchType !== 'practice') matchType = 'practice';
+        officialMatchNumber = parseInt(officialMatchNumber || 1, 10) || 1;
+        var today = getTodayKey();
+        if (!matchDateKey) matchDateKey = today;
+        if (matchType === 'practice' && matchDateKey !== today) {
+            // 練習試合は日付が変わったら第1セットから開始する。
+            currentSet = 1;
+            setData = createEmptyStats();
+            historyLog = [];
+            timeoutCount = { us: 0, them: 0 };
+            subCount = { us: 0, them: 0 };
+            startSideSetting = 'S';
+            hasServeAuthority = true;
+            matchDateKey = today;
+        }
+    }
+
+    function resetCurrentSetForMatchChange() {
+        currentSet = 1;
+        setData = createEmptyStats();
+        historyLog = [];
+        timeoutCount = { us: 0, them: 0 };
+        subCount = { us: 0, them: 0 };
+        startSideSetting = 'S';
+        hasServeAuthority = true;
+        closeLineupPlayerPicker();
+        updateSideToggleUI();
+    }
+
+    function setMatchTypeUI(type) {
+        var officialBtn = document.getElementById('match-type-official-btn');
+        var practiceBtn = document.getElementById('match-type-practice-btn');
+        var officialBox = document.getElementById('official-match-settings');
+        var practiceBox = document.getElementById('practice-match-settings');
+        if (officialBtn) officialBtn.classList.toggle('active', type === 'official');
+        if (practiceBtn) practiceBtn.classList.toggle('active', type === 'practice');
+        if (officialBox) officialBox.style.display = type === 'official' ? 'block' : 'none';
+        if (practiceBox) practiceBox.style.display = type === 'practice' ? 'block' : 'none';
+        var summary = document.getElementById('match-management-summary');
+        var input = document.getElementById('official-match-number-input');
+        var nextNo = input ? (parseInt(input.value || officialMatchNumber, 10) || 1) : officialMatchNumber;
+        if (summary) {
+            summary.innerHTML = type === 'official'
+                ? '設定予定：公式戦 第' + nextNo + '試合<br>適用後の表示：第1セットから管理'
+                : '設定予定：練習試合<br>同日内はセット数を積み上げ、日付変更時は第1セットへ戻します。';
+        }
+    }
+
+    function updateMatchManagementUI() {
+        var input = document.getElementById('official-match-number-input');
+        if (input) input.value = officialMatchNumber;
+        var practiceSummary = document.getElementById('practice-date-summary');
+        if (practiceSummary) practiceSummary.innerText = '管理日付：' + (matchDateKey || getTodayKey()) + ' / 今日：' + getTodayKey();
+        setMatchTypeUI(matchType);
+        var contextEl = document.getElementById('match-context-display');
+        if (contextEl) contextEl.innerText = getMatchLabel();
+    }
+
+    function applyMatchSettings() {
+        var selectedType = document.getElementById('match-type-official-btn') && document.getElementById('match-type-official-btn').classList.contains('active') ? 'official' : 'practice';
+        var input = document.getElementById('official-match-number-input');
+        var nextNumber = input ? (parseInt(input.value || '1', 10) || 1) : officialMatchNumber;
+        if (nextNumber < 1) nextNumber = 1;
+        var shouldReset = false;
+        if (selectedType !== matchType) shouldReset = true;
+        if (selectedType === 'official' && nextNumber !== officialMatchNumber) shouldReset = true;
+        var msg = selectedType === 'official'
+            ? '公式戦 第' + nextNumber + '試合に設定します。セット数は第1セットに戻ります。よろしいですか？'
+            : '練習試合に設定します。日付管理により、同日内はセット数を積み上げます。よろしいですか？';
+        if (shouldReset && !confirm(msg)) return;
+        matchType = selectedType;
+        officialMatchNumber = nextNumber;
+        if (matchType === 'practice') matchDateKey = getTodayKey();
+        if (shouldReset) resetCurrentSetForMatchChange();
+        saveStorage();
+        updateMatchManagementUI();
+        updateUI();
+        alert('試合管理を更新しました。');
+    }
+
+    function initSetup() {
+        loadStorage(); 
+        updateBaseDataUI();
+        document.getElementById('opp-team-name-input').value = oppTeamName;
+        updateOppLabels();
+        updateSideToggleUI();
+        updateMatchManagementUI();
+
+        var btnContainer = document.getElementById('player-btn-container');
+        var editContainer = document.getElementById('edit-inputs-container');
+        btnContainer.innerHTML = ''; editContainer.innerHTML = '';
+
+        for (var m = 0; m < players.length; m++) {
+            (function(p) {
+                var btn = document.createElement('button');
+                var isOpp = (p === 'team');
+                btn.className = 'p-btn' + (isOpp ? ' opp-team-btn' : '') + (p === selectedPlayer ? ' active' : '');
+                btn.id = 'btn-' + p; btn.innerText = isOpp ? playerNames[p] : getPlayerDisplayName(p);
+                btn.onclick = function() { selectPlayer(p); };
+                btnContainer.appendChild(btn);
+
+                if (!isOpp) {
+                    var div = document.createElement('div');
+                    div.className = 'edit-input player-data-row';
+                    div.style.flexDirection = 'column';
+                    div.style.alignItems = 'stretch';
+                    div.innerHTML = '<div style="font-size:0.78rem;color:#94a3b8;font-weight:bold;">登録' + p.replace('p','') + '（内部ID：' + p + '）</div>' +
+                                    '<div style="display:grid;grid-template-columns:80px 1fr;gap:6px;align-items:center;">' +
+                                    '<input type="text" id="number-' + p + '" value="' + escapeHtml(playerNumbers[p] || p.replace('p','')) + '" placeholder="背番号" inputmode="numeric" style="width:100%;box-sizing:border-box;">' +
+                                    '<input type="text" id="input-' + p + '" value="' + escapeHtml(playerNames[p]) + '" placeholder="氏名" style="width:100%;box-sizing:border-box;">' +
+                                    '</div>';
+                    editContainer.appendChild(div);
+                    div.querySelector('#number-' + p).oninput = function() { renamePlayerNumber(p, this.value); };
+                    div.querySelector('#input-' + p).oninput = function() { renamePlayer(p, this.value); };
+                }
+            })(players[m]);
+        }
+        document.getElementById('current-set-num').innerText = currentSet;
+        
+        buildArchiveDaySelect();
+        updateAutoBackupUI();
+        updateUI();
+    }
+
+    function setStartSide(side) {
+        if (historyLog.length > 0) {
+            if (!confirm('すでに現在のセットの得点記録が始まっています。開始設定を変更すると、これまでのローテーション計算が再計算されます。変更しますか？')) {
+                return;
+            }
+        }
+        startSideSetting = side;
+        updateSideToggleUI();
+        saveStorage();
+        updateUI();
+    }
+
+    function updateSideToggleUI() {
+        var sBtn = document.getElementById('side-s-btn');
+        var rBtn = document.getElementById('side-r-btn');
+        if (startSideSetting === 'S') {
+            sBtn.classList.add('active'); rBtn.classList.remove('active');
+        } else {
+            rBtn.classList.add('active'); sBtn.classList.remove('active');
+        }
+    }
+
+    function getAppFullTitle() {
+        return (appTitlePrefix && appTitlePrefix.trim() ? appTitlePrefix.trim() : 'SEIMEI HS') + ' Volleyball Tracker';
+    }
+
+    function updateBaseDataUI() {
+        var titleEl = document.getElementById('app-title-display');
+        if (titleEl) titleEl.innerText = getAppFullTitle();
+        document.title = getAppFullTitle();
+        var teamEl = document.getElementById('self-team-name-display');
+        if (teamEl) teamEl.innerText = selfTeamName || '清明';
+        var prefixInput = document.getElementById('app-title-prefix-input');
+        if (prefixInput) prefixInput.value = appTitlePrefix || 'SEIMEI HS';
+        var teamInput = document.getElementById('self-team-name-input');
+        if (teamInput) teamInput.value = selfTeamName || '清明';
+        var labels = document.getElementsByClassName('self-team-text-label');
+        for (var i=0; i<labels.length; i++) labels[i].innerText = selfTeamName || '清明';
+    }
+
+    function updateBaseDataSettings() {
+        var prefixInput = document.getElementById('app-title-prefix-input');
+        var teamInput = document.getElementById('self-team-name-input');
+        appTitlePrefix = prefixInput && prefixInput.value.trim() ? prefixInput.value.trim() : 'SEIMEI HS';
+        selfTeamName = teamInput && teamInput.value.trim() ? teamInput.value.trim() : '清明';
+        updateBaseDataUI();
+        saveStorage();
+        updateUI();
+    }
+
+    function updateOppName(val) {
+        oppTeamName = val.trim() ? val : '相手';
+        updateOppLabels();
+        saveStorage();
+        updateUI(); 
+    }
+
+    function updateOppLabels() {
+        playerNames['team'] = oppTeamName + '(全体)';
+        var oppBtn = document.getElementById('btn-team');
+        if(oppBtn) oppBtn.innerText = playerNames['team'];
+        setAnalysisOpponentLabel(getCurrentAnalysisOpponentLabel());
+    }
+
+    function setAnalysisOpponentLabel(label) {
+        var safeLabel = label || '相手';
+        var labels = document.getElementsByClassName('opp-team-text-label');
+        for(var i=0; i<labels.length; i++) {
+            labels[i].innerText = safeLabel;
+        }
+    }
+
+    function getCurrentAnalysisOpponentLabel() {
+        return currentView === 'set' ? (oppTeamName || '相手') : '相手';
+    }
+
+    function getCurrentStatsNameMap() {
+        var map = Object.assign({}, playerNames);
+        if (currentView !== 'set') {
+            map['team'] = '相手(全体)';
+        }
+        return map;
+    }
+
+    function getUniqueOppNames(items) {
+        var list = [];
+        for (var i = 0; i < items.length; i++) {
+            var name = (items[i].oppName || '相手').trim() || '相手';
+            if (!list.includes(name)) list.push(name);
+        }
+        return list;
+    }
+
+    function getArchiveTotalNameMap(daySets, baseMap) {
+        var map = Object.assign({}, baseMap || playerNames);
+        var oppList = getUniqueOppNames(daySets || []);
+        map['team'] = (oppList.length === 1 ? oppList[0] : '相手') + '(全体)';
+        return map;
+    }
+
+    var posLabels = { 1: 'BR (P1)', 2: 'FR (P2)', 3: 'FC (P3)', 4: 'FL (P4)', 5: 'BL (P5)', 6: 'BC (P6)' };
+
+    function drawCourt(runtimeRotation) {
+        for(var pos=1; pos<=6; pos++) {
+            var pId = runtimeRotation[pos];
+            var numEl = document.getElementById('num-p' + pos);
+            var nameEl = document.getElementById('name-p' + pos);
+            var cellEl = document.getElementById('pos-p' + pos);
+            
+            if(pId && pId !== 'none') {
+                numEl.innerText = getPlayerNumber(pId);
+                nameEl.innerText = getPlayerNameOnly(pId);
+            } else {
+                numEl.innerText = '-';
+                nameEl.innerText = '未配置';
+            }
+
+            if(pos === 1 && hasServeAuthority) {
+                cellEl.classList.add('server');
+            } else {
+                cellEl.classList.remove('server');
+            }
+        }
+    }
+
+    function drawStartingLineupBox() {
+        for(var pos=1; pos<=6; pos++) {
+            var pId = startingLineup[pos];
+            var startNumEl = document.getElementById('start-num-' + pos);
+            var startNameEl = document.getElementById('start-name-' + pos);
+            var cellEl = startNumEl ? startNumEl.closest('.start-cell') : null;
+            
+            if(pId) {
+                startNumEl.innerText = getPlayerNumber(pId);
+                startNameEl.innerText = getPlayerNameOnly(pId);
+                if (cellEl) { cellEl.classList.add('filled'); cellEl.classList.remove('empty'); }
+            } else {
+                startNumEl.innerText = '-';
+                startNameEl.innerText = '未配置';
+                if (cellEl) { cellEl.classList.add('empty'); cellEl.classList.remove('filled'); }
+            }
+        }
+    }
+
+    var selectingLineupPos = null;
+
+    function changeStartingPlayer(pos) {
+        selectingLineupPos = pos;
+        var picker = document.getElementById('lineup-player-picker');
+        var title = document.getElementById('lineup-picker-title');
+        var box = document.getElementById('lineup-player-buttons');
+        if (!picker || !title || !box) return;
+
+        title.innerText = posLabels[pos] + ' に配置する選手を選択';
+        box.innerHTML = '';
+
+        var usedMap = {};
+        for (var lineupPos in startingLineup) {
+            if (parseInt(lineupPos) !== pos && startingLineup[lineupPos]) {
+                usedMap[startingLineup[lineupPos]] = true;
+            }
+        }
+
+        for (var i = 1; i <= 20; i++) {
+            (function(num) {
+                var pId = 'p' + num;
+                var btn = document.createElement('button');
+                btn.className = 'lineup-player-btn';
+                if (startingLineup[pos] === pId) btn.classList.add('current');
+                if (usedMap[pId]) btn.classList.add('used');
+                btn.innerHTML = '<span style="font-size:1rem;">' + escapeHtml(getPlayerNumber(pId)) + '</span><br><span style="font-size:0.78rem;">' + escapeHtml(getPlayerNameOnly(pId)) + '</span>' + (usedMap[pId] ? '<br><span class="lineup-used-badge">コート内</span>' : '');
+                btn.onclick = function() { setStartingPlayerFromButton(pId); };
+                box.appendChild(btn);
+            })(i);
+        }
+
+        picker.classList.add('active');
+        picker.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function setStartingPlayerFromButton(playerId) {
+        if (!selectingLineupPos) return;
+        var targetPos = selectingLineupPos;
+        startingLineup[targetPos] = playerId;
+
+        // ポップアップを閉じなくても、S-Lineupの6枠・コート表示・保存データが即時更新されるように明示的に再描画する。
+        drawStartingLineupBox();
+        saveStorage();
+        updateUI();
+
+        var status = document.getElementById('lineup-rotate-status');
+        if (status) status.innerText = posLabels[targetPos] + ' に ' + getPlayerDisplayName(playerId) + ' を配置しました。';
+        closeLineupPlayerPicker();
+    }
+
+    function closeLineupPlayerPicker() {
+        selectingLineupPos = null;
+        var picker = document.getElementById('lineup-player-picker');
+        if (picker) picker.classList.remove('active');
+    }
+
+    function computeRotateClockwise(rotObj) {
+        var temp = rotObj[1];
+        rotObj[1] = rotObj[2];
+        rotObj[2] = rotObj[3];
+        rotObj[3] = rotObj[4];
+        rotObj[4] = rotObj[5];
+        rotObj[5] = rotObj[6];
+        rotObj[6] = temp;
+        return rotObj;
+    }
+
+    function computeRotateCounterClockwise(rotObj) {
+        var temp = rotObj[1];
+        rotObj[1] = rotObj[6];
+        rotObj[6] = rotObj[5];
+        rotObj[5] = rotObj[4];
+        rotObj[4] = rotObj[3];
+        rotObj[3] = rotObj[2];
+        rotObj[2] = temp;
+        return rotObj;
+    }
+
+    function normalizeStartingLineupMap(src) {
+        var out = {};
+        for (var pos = 1; pos <= 6; pos++) {
+            out[pos] = (src && src[pos]) ? src[pos] : null;
+        }
+        return out;
+    }
+
+    function rotateLineupOnceForward(lineup) {
+        // バレーのローテーションを1つ進める：P2→P1、P3→P2、P4→P3、P5→P4、P6→P5、P1→P6
+        var cur = normalizeStartingLineupMap(lineup);
+        return { 1: cur[2], 2: cur[3], 3: cur[4], 4: cur[5], 5: cur[6], 6: cur[1] };
+    }
+
+    function rotateLineupOnceBack(lineup) {
+        // 1つ戻す：P6→P1、P1→P2、P2→P3、P3→P4、P4→P5、P5→P6
+        var cur = normalizeStartingLineupMap(lineup);
+        return { 1: cur[6], 2: cur[1], 3: cur[2], 4: cur[3], 5: cur[4], 6: cur[5] };
+    }
+
+    function getLineupRotateCount() {
+        var sel = document.getElementById('lineup-rotate-count');
+        var n = sel ? parseInt(sel.value, 10) : 1;
+        if (!n || n < 1) n = 1;
+        if (n > 5) n = 5;
+        return n;
+    }
+
+    function clearStartingLineup() {
+        if (!confirm('S-Lineupの6か所をすべて消去しますか？')) return;
+        for (var pos = 1; pos <= 6; pos++) {
+            startingLineup[pos] = null;
+        }
+        closeLineupPlayerPicker();
+        drawStartingLineupBox();
+        saveStorage();
+        updateUI();
+        var status = document.getElementById('lineup-rotate-status');
+        if (status) status.innerText = 'S-Lineupを6か所とも消去しました。必要なポジションをタップして再設定してください。';
+    }
+
+    function rotateStartingLineupBy(delta) {
+        var steps = Math.abs(parseInt(delta, 10) || 0);
+        if (steps === 0) return;
+        // 6ローテで元に戻るので無駄な処理を避ける
+        steps = steps % 6;
+        if (steps === 0) return;
+
+        var next = normalizeStartingLineupMap(startingLineup);
+        for (var i = 0; i < steps; i++) {
+            next = (delta > 0) ? rotateLineupOnceForward(next) : rotateLineupOnceBack(next);
+        }
+        startingLineup = next;
+        closeLineupPlayerPicker();
+        drawStartingLineupBox();
+        saveStorage();
+        updateUI();
+
+        var status = document.getElementById('lineup-rotate-status');
+        if (status) {
+            status.innerText = (delta > 0 ? steps + 'つ進めました。' : steps + 'つ戻しました。') + ' 配置を確認してからセットを開始してください。';
+        }
+    }
+
+    function shiftStartingLineup(direction) {
+        // 旧ボタン互換用。HTMLのキャッシュが残っていても動くように残します。
+        rotateStartingLineupBy(direction === 'forward' ? 1 : -1);
+    }
+
+    function selectPlayer(id) {
+        selectedPlayer = id;
+        var buttons = document.getElementsByClassName('p-btn');
+        for (var i = 0; i < buttons.length; i++) { buttons[i].classList.remove('active'); }
+        document.getElementById('btn-' + id).classList.add('active');
+        saveStorage();
+    }
+
+    function renamePlayer(id, newName) {
+        playerNames[id] = newName.trim() ? newName.trim() : '選手 No.' + id.replace('p','');
+        updatePlayerButtonLabel(id);
+        updateUI();
+    }
+
+    function renamePlayerNumber(id, newNumber) {
+        playerNumbers[id] = String(newNumber || '').trim() || id.replace('p','');
+        updatePlayerButtonLabel(id);
+        updateUI();
+    }
+
+    function getDisplayedScore() {
+        return {
+            us: parseInt(document.getElementById('score-us').innerText, 10) || 0,
+            them: parseInt(document.getElementById('score-them').innerText, 10) || 0
+        };
+    }
+
+    function openScoreAdjustModal() {
+        var sc = getDisplayedScore();
+        document.getElementById('score-adjust-us').value = sc.us;
+        document.getElementById('score-adjust-them').value = sc.them;
+        document.getElementById('score-adjust-us-label').innerText = selfTeamName || '自チーム';
+        document.getElementById('score-adjust-them-label').innerText = oppTeamName || '相手';
+        document.getElementById('score-adjust-before').innerText = '現在表示：' + sc.us + ' - ' + sc.them;
+        document.getElementById('score-adjust-note').value = '';
+        openModal('scoreAdjustModal');
+    }
+
+    function stepScoreAdjust(side, delta) {
+        var el = document.getElementById(side === 'us' ? 'score-adjust-us' : 'score-adjust-them');
+        if (!el) return;
+        var v = parseInt(el.value, 10) || 0;
+        el.value = Math.max(0, v + delta);
+    }
+
+    function applyScoreAdjustment() {
+        var before = getDisplayedScore();
+        var toUs = Math.max(0, parseInt(document.getElementById('score-adjust-us').value, 10) || 0);
+        var toThem = Math.max(0, parseInt(document.getElementById('score-adjust-them').value, 10) || 0);
+        if (before.us === toUs && before.them === toThem) {
+            alert('得点が変更されていません。');
+            return;
+        }
+        var note = (document.getElementById('score-adjust-note').value || '').trim();
+        historyLog.push({
+            type: 'score_adjust',
+            fromUs: before.us,
+            fromThem: before.them,
+            toUs: toUs,
+            toThem: toThem,
+            note: note,
+            timestamp: new Date().toISOString()
+        });
+        closeModal('scoreAdjustModal');
+        updateUI();
+    }
+
+    function recordTimeout(team) {
+        if (timeoutCount[team] >= 2) { alert('タイムアウト上限に達しています。'); return; }
+        var scoreUs = document.getElementById('score-us').innerText;
+        var scoreThem = document.getElementById('score-them').innerText;
+        timeoutCount[team]++;
+        historyLog.push({ type: 'timeout', team: team, scoreAt: scoreUs + '-' + scoreThem });
+        updateUI();
+    }
+
+    var editChoiceTargetIndex = null;
+
+    function escapeHtml(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+        });
+    }
+
+    function showChoiceModal(title, subtitle, options, compact, extraHtml) {
+        document.getElementById('choice-modal-title').innerText = title || '選択';
+        document.getElementById('choice-modal-subtitle').innerText = subtitle || '';
+        document.getElementById('choice-modal-extra').innerHTML = extraHtml || '';
+        var box = document.getElementById('choice-modal-options');
+        box.className = 'choice-grid' + (compact ? ' compact' : '');
+        box.innerHTML = '';
+        for (var i = 0; i < options.length; i++) {
+            (function(opt) {
+                var btn = document.createElement('button');
+                btn.className = 'choice-btn' + (opt.kind ? ' ' + opt.kind : '');
+                btn.innerHTML = opt.html || opt.label;
+                btn.onclick = function() { if (opt.onClick) opt.onClick(); };
+                box.appendChild(btn);
+            })(options[i]);
+        }
+        openModal('choiceModal');
+    }
+
+    function closeChoiceModal() { closeModal('choiceModal'); }
+
+    function playerChoiceOptions(includeTeam, handler) {
+        var opts = [];
+        for (var i = 1; i <= 20; i++) {
+            (function(num) {
+                var id = 'p' + num;
+                opts.push({
+                    html: '<span class="choice-player-num">' + escapeHtml(getPlayerNumber(id)) + '</span><span class="choice-player-name">' + escapeHtml(getPlayerNameOnly(id)) + '</span>',
+                    onClick: function() { handler(id); }
+                });
+            })(i);
+        }
+        if (includeTeam) {
+            opts.push({ label: '相手チーム全体', kind: 'warning', onClick: function(){ handler('team'); } });
+        }
+        return opts;
+    }
+
+    function playerChoiceOptionsFromIds(ids, handler, kindClass) {
+        var opts = [];
+        for (var i = 0; i < ids.length; i++) {
+            (function(id) {
+                var num = getPlayerNumber(id);
+                opts.push({
+                    kind: kindClass || '',
+                    html: '<span class="choice-player-num">' + escapeHtml(num) + '</span><span class="choice-player-name">' + escapeHtml(getPlayerNameOnly(id)) + '</span>',
+                    onClick: function() { handler(id); }
+                });
+            })(ids[i]);
+        }
+        return opts;
+    }
+
+    function allOwnPlayerIds() {
+        var arr = [];
+        for (var i = 1; i <= 20; i++) arr.push('p' + i);
+        return arr;
+    }
+
+    function getCurrentRotationStateForSubstitution() {
+        var rotationState = Object.assign({}, startingLineup);
+        var serverState = (startSideSetting === 'S');
+        var isFirstPointAfterReceiveStart = (startSideSetting === 'R');
+        for (var i = 0; i < historyLog.length; i++) {
+            var action = historyLog[i];
+            if (action.type === 'stat') {
+                var item = action.item;
+                var isUsAction = (action.player !== 'team');
+                var isPositive = ['attack_kill', 'block_kill', 'serve_ace'].includes(item);
+                var isUsPoint = isUsAction ? isPositive : !isPositive;
+                if (isUsPoint) {
+                    if (serverState === false) {
+                        rotationState = computeRotateClockwise(rotationState);
+                        serverState = true;
+                        if (isFirstPointAfterReceiveStart) isFirstPointAfterReceiveStart = false;
+                    }
+                } else {
+                    if (serverState === true) {
+                        serverState = false;
+                        if (isFirstPointAfterReceiveStart) isFirstPointAfterReceiveStart = false;
+                    }
+                }
+            } else if (action.type === 'substitution' && action.team === 'us' && action.outPlayer && action.inPlayer) {
+                for (var posKey in rotationState) {
+                    if (rotationState[posKey] === action.outPlayer) rotationState[posKey] = action.inPlayer;
+                }
+            }
+        }
+        return rotationState;
+    }
+
+    function getCourtPlayerIds() {
+        var rotation = getCurrentRotationStateForSubstitution();
+        var result = [];
+        for (var pos = 1; pos <= 6; pos++) {
+            var id = rotation[pos];
+            if (id && id !== 'none' && result.indexOf(id) === -1) result.push(id);
+        }
+        return result;
+    }
+
+    function getBenchPlayerIds(courtIds) {
+        var courtMap = {};
+        for (var i = 0; i < courtIds.length; i++) courtMap[courtIds[i]] = true;
+        var result = [];
+        for (var n = 1; n <= 20; n++) {
+            var id = 'p' + n;
+            if (!courtMap[id]) result.push(id);
+        }
+        return result;
+    }
+
+    function uniquePlayerIds(arr) {
+        var seen = {};
+        var result = [];
+        for (var i = 0; i < arr.length; i++) {
+            var id = arr[i];
+            if (id && id !== 'none' && !seen[id]) { seen[id] = true; result.push(id); }
+        }
+        return result;
+    }
+
+    function getStartingPlayerIds() {
+        var arr = [];
+        for (var pos = 1; pos <= 6; pos++) arr.push(startingLineup[pos]);
+        return uniquePlayerIds(arr);
+    }
+
+    function buildSubstitutionRuleState() {
+        var starters = getStartingPlayerIds();
+        var starterMap = {};
+        for (var i = 0; i < starters.length; i++) starterMap[starters[i]] = true;
+
+        var state = {
+            starters: starters,
+            starterMap: starterMap,
+            pairByStarter: {},       // starter -> substitute
+            pairedStarterBySub: {},  // substitute -> starter
+            starterReturned: {},     // starter has already returned once
+            subExited: {}            // substitute has left court after entering
+        };
+
+        for (var h = 0; h < historyLog.length; h++) {
+            var a = historyLog[h];
+            if (!a || a.type !== 'substitution' || a.team !== 'us' || !a.outPlayer || !a.inPlayer || a.exceptionalSub) continue;
+
+            var outIsStarter = !!starterMap[a.outPlayer];
+            var inIsStarter = !!starterMap[a.inPlayer];
+
+            if (outIsStarter && !inIsStarter) {
+                if (!state.pairByStarter[a.outPlayer]) state.pairByStarter[a.outPlayer] = a.inPlayer;
+                if (!state.pairedStarterBySub[a.inPlayer]) state.pairedStarterBySub[a.inPlayer] = a.outPlayer;
+            } else if (!outIsStarter && inIsStarter) {
+                if (state.pairByStarter[a.inPlayer] === a.outPlayer) {
+                    state.starterReturned[a.inPlayer] = true;
+                    state.subExited[a.outPlayer] = true;
+                } else {
+                    // 既存データや手動編集で組み合わせが崩れた場合も、安全側に倒して再出場不可にする
+                    state.subExited[a.outPlayer] = true;
+                }
+            }
+        }
+        return state;
+    }
+
+    function getLegalSubOutPlayerIds() {
+        var courtIds = getCourtPlayerIds();
+        var state = buildSubstitutionRuleState();
+        var result = [];
+        for (var i = 0; i < courtIds.length; i++) {
+            var id = courtIds[i];
+            if (state.starterMap[id]) {
+                // スタメンは、いったん戻った後は同セット内で再びOUTできない
+                if (!state.starterReturned[id]) result.push(id);
+            } else {
+                // 交代で入った選手は、同じ組み合わせのスタメンと戻す場合だけOUT候補にする
+                var pairedStarter = state.pairedStarterBySub[id];
+                if (pairedStarter && !state.starterReturned[pairedStarter]) result.push(id);
+            }
+        }
+        return result;
+    }
+
+    function getLegalSubInPlayerIds(outId) {
+        var courtIds = getCourtPlayerIds();
+        var benchIds = getBenchPlayerIds(courtIds);
+        var benchMap = {};
+        for (var b = 0; b < benchIds.length; b++) benchMap[benchIds[b]] = true;
+        var state = buildSubstitutionRuleState();
+
+        if (state.starterMap[outId]) {
+            var result = [];
+            for (var i = 0; i < benchIds.length; i++) {
+                var id = benchIds[i];
+                // スタメン同士の交代は通常交代では候補外。交代で入って一度退いた選手も再出場不可。
+                if (!state.starterMap[id] && !state.subExited[id]) result.push(id);
+            }
+            return result;
+        }
+
+        var pairedStarter = state.pairedStarterBySub[outId];
+        if (pairedStarter && benchMap[pairedStarter] && !state.starterReturned[pairedStarter]) return [pairedStarter];
+        return [];
+    }
+
+    function statChoiceOptions(handler, isUsAction) {
+        var keys = ['attack_kill','attack_error','block_kill','block_error','serve_ace','serve_error','reception_error','dig_error','toss_error','other_error','v_net','v_over','v_passing','v_dribble','v_hold','v_positional'];
+        var opts = [];
+        for (var i = 0; i < keys.length; i++) {
+            (function(key) {
+                var positive = ['attack_kill','block_kill','serve_ace'].includes(key);
+                opts.push({
+                    label: getLabel(key, isUsAction),
+                    kind: positive ? 'success' : (key.indexOf('v_') === 0 ? 'warning' : 'danger'),
+                    onClick: function(){ handler(key); }
+                });
+            })(keys[i]);
+        }
+        return opts;
+    }
+
+    function opponentNumberOptions(handler) {
+        var opts = [];
+        for (var i = 1; i <= 30; i++) {
+            (function(num) { opts.push({ label: String(num), onClick: function(){ handler(String(num)); } }); })(i);
+        }
+        return opts;
+    }
+
+    function recordSubstitution(team) {
+        if (subCount[team] >= 6) { alert('メンバー交代上限に達しています。'); return; }
+        startSubstitutionFlow(team, null, function(subInfo) {
+            var scoreUs = document.getElementById('score-us').innerText;
+            var scoreThem = document.getElementById('score-them').innerText;
+            subInfo.type = 'substitution';
+            subInfo.team = team;
+            subInfo.scoreAt = scoreUs + '-' + scoreThem;
+            subCount[team]++;
+            historyLog.push(subInfo);
+            updateUI();
+        });
+    }
+
+    function startSubstitutionFlow(team, existingAction, done) {
+        if (team === 'us') {
+            showChoiceModal('交代選手を記録', (selfTeamName + 'の交代内容を選択してください。通常はOUTをコート内6人、INをコート外選手に絞って表示します。'), [
+                { label: '交代回数のみ', onClick: function(){ closeChoiceModal(); done({}); } },
+                { label: '交代選手を記録', kind: 'success', onClick: function(){ chooseSubOutPlayer(done, false); } }
+            ], false);
+        } else {
+            showChoiceModal('相手交代記録', '相手チームの交代内容を選択してください。番号はボタンで選べます。', [
+                { label: '交代回数のみ', onClick: function(){ closeChoiceModal(); done({ note: '' }); } },
+                { label: '相手番号を選ぶ', kind: 'warning', onClick: function(){ chooseOpponentSubOut(done); } }
+            ], false);
+        }
+    }
+
+    function chooseSubOutPlayer(done, exceptionalMode) {
+        var ids = exceptionalMode ? allOwnPlayerIds() : getLegalSubOutPlayerIds();
+        var opts = playerChoiceOptionsFromIds(ids, function(outId){ chooseSubInPlayer(outId, done, exceptionalMode); }, 'out-mode');
+        if (!exceptionalMode) {
+            if (opts.length === 0) opts.push({ label: '通常交代の候補なし', kind: 'danger', onClick: function(){} });
+            opts.push({ label: '例外的な交代', kind: 'warning', onClick: function(){ chooseSubOutPlayer(done, true); } });
+        }
+        var sub = exceptionalMode ? '例外モード：OUT/INとも全選手から選択できます。' : '通常モード：競技者交代の組み合わせ規定に沿って、OUT候補を絞っています。';
+        showChoiceModal('OUT', sub, opts, false, '<div class="choice-step-note out-label"><strong>OUT</strong>：コートから下がる選手</div>');
+    }
+
+    function chooseSubInPlayer(outId, done, exceptionalMode) {
+        var ids = exceptionalMode ? allOwnPlayerIds() : getLegalSubInPlayerIds(outId);
+        ids = ids.filter(function(id){ return id !== outId; });
+        var opts = playerChoiceOptionsFromIds(ids, function(inId){
+            closeChoiceModal();
+            done({ outPlayer: outId, inPlayer: inId, exceptionalSub: !!exceptionalMode });
+        }, 'in-mode');
+        if (!exceptionalMode && opts.length === 0) opts.push({ label: '通常交代の候補なし', kind: 'danger', onClick: function(){} });
+        var extra = '<div class="choice-step-note out-label"><strong>OUT</strong>：' + escapeHtml(getPlayerDisplayName(outId)) + '</div>' +
+                    '<div class="choice-step-note in-label"><strong>IN</strong>：入る選手を選択</div>';
+        var sub = exceptionalMode ? '例外モード：全選手から選べます。' : '通常モード：スタメンの再出場は同じ交代相手との組み合わせだけに絞っています。';
+        showChoiceModal('IN', sub, opts, false, extra);
+    }
+
+    function chooseOpponentSubOut(done) {
+        showChoiceModal('OUT', '相手チームで下がる番号を選んでください。', opponentNumberOptions(function(outNo){ chooseOpponentSubIn(outNo, done); }), true);
+    }
+
+    function chooseOpponentSubIn(outNo, done) {
+        var extra = '<div class="choice-step-note out-label"><strong>OUT</strong>：' + escapeHtml(outNo) + '</div>' + '<div class="choice-step-note in-label"><strong>IN</strong>：入る番号を選択</div>';
+        showChoiceModal('IN', '相手チームで入る番号を選んでください。', opponentNumberOptions(function(inNo){
+            closeChoiceModal();
+            done({ note: outNo + ' → ' + inNo, outOppNum: outNo, inOppNum: inNo });
+        }), true, extra);
+    }
+
+    function addStat(item) {
+        activePlayerHighlightFix(selectedPlayer);
+        setData[selectedPlayer][item] = (setData[selectedPlayer][item] || 0) + 1;
+        todayData[selectedPlayer][item] = (todayData[selectedPlayer][item] || 0) + 1;
+        allData[selectedPlayer][item] = (allData[selectedPlayer][item] || 0) + 1;
+        
+        historyLog.push({ type: 'stat', player: selectedPlayer, item: item });
+        updateUI();
+    }
+
+    function activePlayerHighlightFix(id) {
+        var btn = document.getElementById('btn-' + id);
+        if(btn) {
+            var buttons = document.getElementsByClassName('p-btn');
+            for (var i = 0; i < buttons.length; i++) { buttons[i].classList.remove('active'); }
+            btn.classList.add('active');
+        }
+    }
+
+    function undoLast() {
+        if (historyLog.length === 0) return;
+        deleteLogAt(historyLog.length - 1, true);
+    }
+
+    function adjustStatCount(player, item, delta) {
+        if (!player || !item) return;
+        if (!setData[player]) setData[player] = {};
+        if (!todayData[player]) todayData[player] = {};
+        if (!allData[player]) allData[player] = {};
+        setData[player][item] = Math.max(0, (setData[player][item] || 0) + delta);
+        todayData[player][item] = Math.max(0, (todayData[player][item] || 0) + delta);
+        allData[player][item] = Math.max(0, (allData[player][item] || 0) + delta);
+    }
+
+    function deleteLogAt(index, skipConfirm) {
+        if (index < 0 || index >= historyLog.length) return;
+        var target = historyLog[index];
+        if (!skipConfirm && !confirm('この記録を削除しますか？')) return;
+        historyLog.splice(index, 1);
+        if (target.type === 'stat') {
+            adjustStatCount(target.player, target.item, -1);
+        } else if (target.type === 'timeout') {
+            if (timeoutCount[target.team] > 0) timeoutCount[target.team]--;
+        } else if (target.type === 'substitution') {
+            if (subCount[target.team] > 0) subCount[target.team]--;
+        }
+        updateUI();
+    }
+
+    function editLogAt(index) {
+        if (index < 0 || index >= historyLog.length) return;
+        var action = historyLog[index];
+        var options = [
+            { label: 'この記録を削除', kind: 'danger', onClick: function(){ closeChoiceModal(); deleteLogAt(index, false); } }
+        ];
+        if (action.type === 'stat') {
+            options.push({ label: '選手を変更', onClick: function(){ chooseEditStatPlayer(index); } });
+            options.push({ label: '内容を変更', onClick: function(){ chooseEditStatItem(index); } });
+        }
+        if (action.type === 'substitution') {
+            options.push({ label: '交代内容を変更', kind: 'warning', onClick: function(){ chooseEditSubstitution(index); } });
+        }
+        showChoiceModal('記録編集', 'タップした記録に対する操作を選んでください。', options, false);
+    }
+
+    function chooseEditStatPlayer(index) {
+        var action = historyLog[index];
+        if (!action || action.type !== 'stat') return;
+        showChoiceModal('選手を変更', '変更後の選手を選んでください。相手チーム全体も選択できます。', playerChoiceOptions(true, function(newPlayer){
+            adjustStatCount(action.player, action.item, -1);
+            action.player = newPlayer;
+            adjustStatCount(action.player, action.item, 1);
+            selectedPlayer = newPlayer;
+            closeChoiceModal();
+            updateUI();
+        }), false);
+    }
+
+    function chooseEditStatItem(index) {
+        var action = historyLog[index];
+        if (!action || action.type !== 'stat') return;
+        var isUsAction = action.player !== 'team';
+        showChoiceModal('内容を変更', '変更後のプレー内容を選んでください。', statChoiceOptions(function(newItem){
+            adjustStatCount(action.player, action.item, -1);
+            action.item = newItem;
+            adjustStatCount(action.player, action.item, 1);
+            closeChoiceModal();
+            updateUI();
+        }, isUsAction), false);
+    }
+
+    function chooseEditSubstitution(index) {
+        var action = historyLog[index];
+        if (!action || action.type !== 'substitution') return;
+        startSubstitutionFlow(action.team, action, function(newInfo){
+            action.outPlayer = newInfo.outPlayer || undefined;
+            action.inPlayer = newInfo.inPlayer || undefined;
+            action.outOppNum = newInfo.outOppNum || undefined;
+            action.inOppNum = newInfo.inOppNum || undefined;
+            action.exceptionalSub = !!newInfo.exceptionalSub;
+            action.note = newInfo.note || '';
+            updateUI();
+        });
+    }
+
+    function finishSet() {
+        var scoreUs = parseInt(document.getElementById('score-us').innerText);
+        var scoreThem = parseInt(document.getElementById('score-them').innerText);
+        
+        if (confirm('第 ' + currentSet + ' セットを終了し、データを保存して次のセットに進みますか？\n対戦相手: ' + oppTeamName + '\nスコア: ' + scoreUs + ' - ' + scoreThem)) {
+            
+            var now = new Date();
+            var weeks = ['日', '月', '火', '水', '木', '金', '土'];
+            var dateString = now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate();
+            var dayString = '（' + weeks[now.getDay()] + '）';
+            var timeString = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            var fullTimestamp = dateString + dayString + ' ' + timeString;
+
+            var archiveItem = {
+                id: 'set_' + Date.now(),
+                date: dateString,
+                timestamp: fullTimestamp,
+                oppName: oppTeamName,
+                matchType: matchType,
+                matchNumber: matchType === 'official' ? officialMatchNumber : null,
+                matchLabel: getMatchLabel(),
+                setNum: currentSet,
+                score: scoreUs + '-' + scoreThem,
+                usScore: scoreUs,
+                themScore: scoreThem,
+                statsSnap: JSON.parse(JSON.stringify(setData)),
+                playerNamesSnap: JSON.parse(JSON.stringify(playerNames)),
+                playerNumbersSnap: JSON.parse(JSON.stringify(playerNumbers)),
+                historyLogSnap: JSON.parse(JSON.stringify(historyLog))
+            };
+
+            globalArchive.push(archiveItem);
+            createAutoBackup(getMatchLabel() + ' 第' + currentSet + 'セット終了 / vs ' + oppTeamName + ' / ' + scoreUs + '-' + scoreThem);
+
+            setResults.push({ matchType: matchType, matchNumber: matchType === 'official' ? officialMatchNumber : null, matchLabel: getMatchLabel(), set: currentSet, us: scoreUs, them: scoreThem, opp: oppTeamName });
+            currentSet++;
+
+            // 次セットはスコア・ログ・T.O・交代回数を完全に初期化。
+            // S-Lineupは前セットのものを残し、S-Lineup画面で必要に応じて調整します。
+            setData = createEmptyStats(); 
+            historyLog = []; 
+            timeoutCount = { us: 0, them: 0 }; 
+            subCount = { us: 0, them: 0 };
+            startSideSetting = 'S'; 
+            hasServeAuthority = true;
+            updateSideToggleUI();
+
+            closeLineupPlayerPicker();
+            buildArchiveDaySelect();
+            updateUI();
+
+            var logContainer = document.getElementById('running-score-log');
+            if (logContainer) logContainer.scrollTop = 0;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            setTimeout(function() {
+                alert('第' + (currentSet - 1) + 'セットを保存しました。第' + currentSet + 'セットを開始できます。S-Lineupは前セットの配置を引き継いでいます。');
+            }, 80);
+        }
+    }
+
+    function buildArchiveDaySelect() {
+        var daySelect = document.getElementById('archive-day-select');
+        daySelect.innerHTML = '<option value="">日付を選択...</option>';
+
+        var uniqueDays = [];
+        for(var i=0; i<globalArchive.length; i++) {
+            var d = globalArchive[i].date;
+            if(!uniqueDays.includes(d)) { uniqueDays.push(d); }
+        }
+        uniqueDays.sort(function(a,b){ return b.localeCompare(a); });
+
+        for(var j=0; j<uniqueDays.length; j++) {
+            var dayOpt = document.createElement('option');
+            dayOpt.value = uniqueDays[j];
+            dayOpt.innerText = uniqueDays[j];
+            daySelect.appendChild(dayOpt);
+        }
+
+        onArchiveDayChanged();
+    }
+
+    function onArchiveDayChanged() {
+        var dayVal = document.getElementById('archive-day-select').value;
+        var setSelect = document.getElementById('archive-set-select');
+        var totalBtn = document.getElementById('archive-day-total-btn');
+        var displayArea = document.getElementById('archive-display-area');
+
+        displayArea.style.display = 'none'; 
+
+        if (!dayVal) {
+            setSelect.innerHTML = '<option value="">まず日付を選んでください</option>';
+            setSelect.disabled = true;
+            totalBtn.disabled = true;
+            return;
+        }
+
+        setSelect.disabled = false;
+        totalBtn.disabled = false;
+
+        setSelect.innerHTML = '<option value="">セットを選択...</option>';
+        var filtered = globalArchive.filter(function(x) { return x.date === dayVal; });
+        
+        for (var i = filtered.length - 1; i >= 0; i--) {
+            var item = filtered[i];
+            var opt = document.createElement('option');
+            opt.value = item.id;
+            
+            var resultMark = '-';
+            var uS = item.usScore !== undefined ? item.usScore : parseInt(item.score.split('-')[0]);
+            var tS = item.themScore !== undefined ? item.themScore : parseInt(item.score.split('-')[1]);
+            if (uS > tS) { resultMark = '○'; } else if (uS < tS) { resultMark = '●'; }
+
+            var itemLabel = item.matchLabel ? (item.matchLabel + ' ') : '';
+            opt.innerText = item.timestamp.split(' ')[1] + '〜 ' + itemLabel + 'vs ' + item.oppName + ' (第' + item.setNum + 'S: ' + item.score + ') ' + resultMark;
+            setSelect.appendChild(opt);
+        }
+    }
+
+    function viewArchiveSetItem() {
+        var setId = document.getElementById('archive-set-select').value;
+        var area = document.getElementById('archive-display-area');
+        var titleEl = document.getElementById('archive-view-title');
+        var tbody = document.getElementById('archive-tbody');
+        var logContainer = document.getElementById('archive-running-score-log');
+        var logTitleEl = document.getElementById('archive-log-title');
+
+        if (!setId) { area.style.display = 'none'; return; }
+
+        var matched = globalArchive.find(function(x){ return x.id === setId; });
+        if(!matched) return;
+
+        tbody.innerHTML = '';
+        logContainer.innerHTML = '';
+
+        var resultMark = '-';
+        var uS = matched.usScore !== undefined ? matched.usScore : parseInt(matched.score.split('-')[0]);
+        var tS = matched.themScore !== undefined ? matched.themScore : parseInt(matched.score.split('-')[1]);
+        if (uS > tS) { resultMark = '○'; } else if (uS < tS) { resultMark = '●'; }
+
+        var matchedLabel = matched.matchLabel ? (matched.matchLabel + ' ') : '';
+        titleEl.innerText = '📑 【1セット記録】 ' + matched.timestamp + ' ' + matchedLabel + 'vs ' + matched.oppName + ' (第' + matched.setNum + 'S: ' + matched.score + ') ' + resultMark;
+        renderTableRows(tbody, matched.statsSnap, matched.playerNamesSnap, matched.playerNumbersSnap);
+        
+        logTitleEl.innerText = '📝 第' + matched.setNum + 'セットのランニングスコア';
+        if (matched.historyLogSnap && matched.historyLogSnap.length > 0) {
+            renderArchiveLogs(logContainer, matched.historyLogSnap, matched.playerNamesSnap, matched.playerNumbersSnap);
+        } else {
+            logContainer.innerHTML = '<div style="color:#aaa; text-align:center; padding-top:10px;">スコアログなし</div>';
+        }
+        area.style.display = 'block';
+    }
+
+    function viewArchiveDayTotal() {
+        var dayVal = document.getElementById('archive-day-select').value;
+        var area = document.getElementById('archive-display-area');
+        var titleEl = document.getElementById('archive-view-title');
+        var tbody = document.getElementById('archive-tbody');
+        var logContainer = document.getElementById('archive-running-score-log');
+        var logTitleEl = document.getElementById('archive-log-title');
+
+        if (!dayVal) return;
+
+        document.getElementById('archive-set-select').value = '';
+
+        var daySets = globalArchive.filter(function(x){ return x.date === dayVal; });
+        if(daySets.length === 0) return;
+
+        tbody.innerHTML = '';
+        logContainer.innerHTML = '';
+
+        var aggregatedStats = createEmptyStats();
+        var oppList = getUniqueOppNames(daySets);
+
+        for(var k=0; k<daySets.length; k++) {
+            var sData = daySets[k].statsSnap;
+            
+            for(var pKey in sData) {
+                for(var sKey in sData[pKey]) {
+                    aggregatedStats[pKey][sKey] += (sData[pKey][sKey] || 0);
+                }
+            }
+        }
+
+        var archiveNameMap = getArchiveTotalNameMap(daySets, daySets[daySets.length-1].playerNamesSnap);
+        var oppTitle = oppList.length === 1 ? oppList[0] : '複数（' + oppList.join(', ') + '）';
+        titleEl.innerText = '📅 【1日合計データ】 ' + dayVal + ' （相手: ' + oppTitle + ' / 計 ' + daySets.length + 'セット）';
+        renderTableRows(tbody, aggregatedStats, archiveNameMap, daySets[daySets.length-1].playerNumbersSnap || playerNumbers);
+        
+        logTitleEl.innerText = '📝 ランニングスコア';
+        logContainer.innerHTML = '<div style="color:#aaa; text-align:center; padding-top:10px;">※1日合算データではランニングスコアは表示されません。各セットごとの詳細ログをご覧ください。</div>';
+        area.style.display = 'block';
+    }
+
+    function renderArchiveLogs(containerElement, logSnap, nameMap, numberMap) {
+        var scoreUs = 0, scoreThem = 0;
+        for (var i = 0; i < logSnap.length; i++) {
+            var action = logSnap[i];
+            if (action.type === 'stat') {
+                var item = action.item; 
+                var isUsAction = (action.player !== 'team'); 
+                var isPositive = ['attack_kill', 'block_kill', 'serve_ace'].includes(item);
+                var isUsPoint = isUsAction ? isPositive : !isPositive;
+                
+                if (isUsPoint) { scoreUs++; } else { scoreThem++; }
+
+                var logItem = document.createElement('div');
+                logItem.className = 'log-item editable-log ' + (isUsPoint ? 'us' : 'them');
+                logItem.onclick = (function(idx){ return function(){ editLogAt(idx); }; })(i);
+                var pName = getPlayerDisplayName(action.player, nameMap, numberMap);
+                
+                if (action.player !== 'team') {
+                    pName = '<span style="color: #7dd3fc; font-weight: 600;">' + pName + '</span>';
+                }
+                
+                logItem.innerHTML = '<strong>[' + scoreUs + ' - ' + scoreThem + ']</strong> ' + pName + ' : ' + getLabelWithMap(item, isUsAction, nameMap);
+                containerElement.appendChild(logItem);
+            } else if (action.type === 'timeout') {
+                var logItem = document.createElement('div'); logItem.className = 'log-item timeout';
+                var teamName = action.team === 'us' ? selfTeamName : (nameMap['team'] ? nameMap['team'].replace('(全体)','') : '相手チーム');
+                logItem.innerHTML = '⏳ T.O: ' + teamName + ' (' + action.scoreAt + ')';
+                containerElement.appendChild(logItem);
+            } else if (action.type === 'substitution') {
+                var logItem = document.createElement('div'); logItem.className = 'log-item substitution';
+                var teamName = action.team === 'us' ? selfTeamName : (nameMap['team'] ? nameMap['team'].replace('(全体)','') : '相手チーム');
+                logItem.innerHTML = '🔄 交代: ' + teamName + ' (' + action.scoreAt + ')';
+                containerElement.appendChild(logItem);
+            } else if (action.type === 'score_adjust') {
+                var beforeText = (action.fromUs || 0) + ' - ' + (action.fromThem || 0);
+                scoreUs = Math.max(0, parseInt(action.toUs, 10) || 0);
+                scoreThem = Math.max(0, parseInt(action.toThem, 10) || 0);
+                var logItem = document.createElement('div'); logItem.className = 'log-item score-adjust';
+                var noteText = action.note ? '：' + action.note : '';
+                logItem.innerHTML = '<strong>[' + scoreUs + ' - ' + scoreThem + ']</strong> ⚙ 得点修正 ' + beforeText + ' → ' + scoreUs + ' - ' + scoreThem + noteText;
+                containerElement.appendChild(logItem);
+            }
+        }
+    }
+
+    function getPlayerStatSummary(p, statsData, nameMap, numberMap) {
+        var d = statsData[p] || {};
+        var ak = d.attack_kill || 0; var ae = d.attack_error || 0;
+        var bk = d.block_kill || 0; var be = d.block_error || 0;
+        var sa = d.serve_ace || 0; var se = d.serve_error || 0;
+        var rcErr = d.reception_error || 0; var dgErr = d.dig_error || 0;
+        var tsErr = d.toss_error || 0; var otErr = d.other_error || 0;
+        var vDr = d.v_dribble || 0; var vNt = d.v_net || 0;
+        var vPs = d.v_passing || 0; var vPo = d.v_positional || 0;
+        var vOv = d.v_over || 0; var vHl = d.v_hold || 0;
+        var techErrors = rcErr + dgErr + tsErr + otErr;
+        var violations = vDr + vNt + vPs + vPo + vOv + vHl;
+        var points = ak + bk + sa;
+        return {
+            id: p, name: getPlayerDisplayName(p, nameMap, numberMap), points: points,
+            ak: ak, ae: ae, bk: bk, be: be, sa: sa, se: se,
+            techErrors: techErrors, violations: violations
+        };
+    }
+
+    function statPairHtml(good, bad) {
+        return '<div class="stat-pair"><span class="stat-good">○' + good + '</span><span class="stat-bad">×' + bad + '</span></div>';
+    }
+
+    function getSortedStatSummaries(statsData, nameMap, numberMap) {
+        var list = players.map(function(p){ return getPlayerStatSummary(p, statsData, nameMap, numberMap); });
+        list.sort(function(a, b) {
+            if (a.id === 'team' && b.id !== 'team') return 1;
+            if (b.id === 'team' && a.id !== 'team') return -1;
+            if (b.points !== a.points) return b.points - a.points;
+            var bErrors = b.techErrors + b.violations + b.ae + b.be + b.se;
+            var aErrors = a.techErrors + a.violations + a.ae + a.be + a.se;
+            if (aErrors !== bErrors) return aErrors - bErrors;
+            return a.id.localeCompare(b.id, 'ja');
+        });
+        return list;
+    }
+
+    function renderTableRows(tbodyElement, statsData, nameMap, numberMap) {
+        var list = getSortedStatSummaries(statsData, nameMap, numberMap);
+        for (var j = 0; j < list.length; j++) {
+            var s = list[j];
+            var row = document.createElement('tr');
+            if(s.id === 'team') row.className = 'opp-summary-row';
+            row.innerHTML = '<td style="font-weight:bold;">' + s.name + '</td>' +
+                            '<td class="point-total">' + s.points + '</td>' +
+                            '<td>' + statPairHtml(s.ak, s.ae) + '</td>' +
+                            '<td>' + statPairHtml(s.bk, s.be) + '</td>' +
+                            '<td>' + statPairHtml(s.sa, s.se) + '</td>' +
+                            '<td><span class="num-red">' + s.techErrors + '</span></td>' +
+                            '<td><span class="num-red">' + s.violations + '</span></td>';
+            tbodyElement.appendChild(row);
+        }
+    }
+
+    // 割合・分析計算ロジック
+    function calculateAndDrawAnalysis(activeData, opponentLabel) {
+        setAnalysisOpponentLabel(opponentLabel || '相手');
+
+        // 1. <span class="self-team-text-label">清明</span>の得点内訳計算
+        var usOwnPoint = 0; // 自力得点（清明のスパイク、ブロック、エース）
+        for (var i = 1; i <= 20; i++) {
+            var pd = activeData['p' + i] || {};
+            usOwnPoint += (pd.attack_kill || 0) + (pd.block_kill || 0) + (pd.serve_ace || 0);
+        }
+        
+        var oppData = activeData['team'] || {};
+        // 相手の各種ミス、反則のすべて＝清明の得点になる
+        var usPointFromOppErr = (oppData.attack_error || 0) + (oppData.block_error || 0) + (oppData.serve_error || 0) +
+                                (oppData.reception_error || 0) + (oppData.dig_error || 0) + (oppData.toss_error || 0) + (oppData.other_error || 0) +
+                                (oppData.v_dribble || 0) + (oppData.v_net || 0) + (oppData.v_over || 0) + (oppData.v_passing || 0) + (oppData.v_positional || 0) + (oppData.v_hold || 0);
+        
+        var totalUsScore = usOwnPoint + usPointFromOppErr;
+        var usOwnPct = 0; var usOppErrPct = 0;
+        if (totalUsScore > 0) {
+            usOwnPct = Math.round((usOwnPoint / totalUsScore) * 100);
+            usOppErrPct = 100 - usOwnPct;
+        }
+
+        document.getElementById('analysis-us-summary').innerText = totalUsScore + '点 (自力 ' + usOwnPct + '% : 相手ミス ' + usOppErrPct + '%)';
+        document.getElementById('bar-us-own').style.width = usOwnPct + '%';
+        document.getElementById('bar-us-opp-err').style.width = usOppErrPct + '%';
+
+        // 2. 相手チームの得点内訳計算
+        // 相手の自力得点（相手のアタック決定、ブロック決定、エース）
+        var themOwnPoint = (oppData.attack_kill || 0) + (oppData.block_kill || 0) + (oppData.serve_ace || 0);
+        
+        // 清明の各種ミス、反則のすべて＝相手チームの得点になる
+        var themPointFromUsErr = 0;
+        for (var i = 1; i <= 20; i++) {
+            var pd = activeData['p' + i] || {};
+            themPointFromUsErr += (pd.attack_error || 0) + (pd.block_error || 0) + (pd.serve_error || 0) +
+                                  (pd.reception_error || 0) + (pd.dig_error || 0) + (pd.toss_error || 0) + (pd.other_error || 0) +
+                                  (pd.v_dribble || 0) + (pd.v_net || 0) + (pd.v_over || 0) + (pd.v_passing || 0) + (pd.v_positional || 0) + (pd.v_hold || 0);
+        }
+
+        var totalThemScore = themOwnPoint + themPointFromUsErr;
+        var themOwnPct = 0; var themUsErrPct = 0;
+        if (totalThemScore > 0) {
+            themOwnPct = Math.round((themOwnPoint / totalThemScore) * 100);
+            themUsErrPct = 100 - themOwnPct;
+        }
+
+        document.getElementById('analysis-them-summary').innerText = totalThemScore + '点 (自力 ' + themOwnPct + '% : ' + (selfTeamName || '清明') + 'ミス ' + themUsErrPct + '%)';
+        document.getElementById('bar-them-opp').style.width = themOwnPct + '%';
+        document.getElementById('bar-them-own-err').style.width = themUsErrPct + '%';
+    }
+
+    function clearArchive() {
+        if(confirm('🚨 これまでに保存した過去のアーカイブデータを【すべて削除】しますか？\n（現在のセットデータは消えません）')) {
+            globalArchive = [];
+            saveStorage();
+            buildArchiveDaySelect();
+        }
+    }
+
+    function switchView(view) {
+        currentView = view;
+        var tabs = document.getElementsByClassName('tab');
+        for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove('active'); }
+        document.getElementById('tab-' + view).classList.add('active');
+        updateUI();
+    }
+
+    function isStandardSetEndReady(scoreUs, scoreThem) {
+        var maxScore = Math.max(scoreUs || 0, scoreThem || 0);
+        var diff = Math.abs((scoreUs || 0) - (scoreThem || 0));
+        return maxScore >= 25 && diff >= 2;
+    }
+
+    function updateSetFinishButtonState(scoreUs, scoreThem) {
+        var btn = document.getElementById('set-finish-btn');
+        var usScoreEl = document.getElementById('score-us');
+        var themScoreEl = document.getElementById('score-them');
+        if (btn) {
+            btn.classList.remove('set-end-ready');
+            btn.innerText = 'セット終了';
+            btn.title = '手動でセット終了できます';
+        }
+        if (usScoreEl) usScoreEl.classList.remove('set-winner-ready');
+        if (themScoreEl) themScoreEl.classList.remove('set-winner-ready');
+
+        var ready = isStandardSetEndReady(scoreUs, scoreThem);
+        if (!ready) return;
+
+        if (btn) btn.title = '25点以上かつ2点差以上：セット終了条件達成';
+        if (scoreUs > scoreThem && usScoreEl) {
+            usScoreEl.classList.add('set-winner-ready');
+        } else if (scoreThem > scoreUs && themScoreEl) {
+            themScoreEl.classList.add('set-winner-ready');
+        }
+    }
+
+    function updateUI() {
+        var currentSetEl = document.getElementById('current-set-num');
+        if (currentSetEl) currentSetEl.innerText = currentSet;
+        var matchContextEl = document.getElementById('match-context-display');
+        if (matchContextEl) matchContextEl.innerText = getMatchLabel();
+        var scoreUs = 0, scoreThem = 0;
+        var logContainer = document.getElementById('running-score-log');
+        logContainer.innerHTML = ''; 
+
+        var toUsEl = document.getElementById('to-us-count');
+        var toThemEl = document.getElementById('to-them-count');
+        var subUsEl = document.getElementById('sub-us-count');
+        var subThemEl = document.getElementById('sub-them-count');
+        toUsEl.innerText = timeoutCount.us;
+        toThemEl.innerText = timeoutCount.them;
+        subUsEl.innerText = subCount.us;
+        subThemEl.innerText = subCount.them;
+        toUsEl.classList.toggle('count-alert', timeoutCount.us >= 2);
+        toThemEl.classList.toggle('count-alert', timeoutCount.them >= 2);
+        subUsEl.classList.toggle('count-alert', subCount.us >= 5);
+        subThemEl.classList.toggle('count-alert', subCount.them >= 5);
+
+        var historyDisplay = document.getElementById('set-history-display');
+        if (setResults && setResults.length > 0) {
+            historyDisplay.innerHTML = setResults.map(function(r) { 
+                var mark = '-';
+                if (r.us > r.them) { mark = '○'; } else if (r.us < r.them) { mark = '●'; }
+                var rLabel = r.matchLabel ? (r.matchLabel + ' ') : '';
+                return '<div class="history-item">' + rLabel + '第' + r.set + 'S vs' + r.opp + ' <b>[' + r.us + '-' + r.them + ']</b> ' + mark + '</div>'; 
+            }).join('');
+            historyDisplay.scrollTop = historyDisplay.scrollHeight;
+        } else { 
+            historyDisplay.innerHTML = '<div style="color:#aaa; text-align:center; padding-top:10px;">履歴なし</div>'; 
+        }
+
+        var currentRotationState = Object.assign({}, startingLineup);
+        var currentServerState = (startSideSetting === 'S'); 
+        var isFirstPointAfterReceiveStart = (startSideSetting === 'R');
+
+        for (var i = 0; i < historyLog.length; i++) {
+            var action = historyLog[i];
+            if (action.type === 'stat') {
+                var item = action.item; 
+                var isUsAction = (action.player !== 'team'); 
+                var isPositive = ['attack_kill', 'block_kill', 'serve_ace'].includes(item);
+                var isUsPoint = isUsAction ? isPositive : !isPositive;
+                
+                if (isUsPoint) { 
+                    scoreUs++; 
+                    if (currentServerState === false) {
+                        currentRotationState = computeRotateClockwise(currentRotationState);
+                        currentServerState = true; 
+                        if (isFirstPointAfterReceiveStart) {
+                            isFirstPointAfterReceiveStart = false; 
+                        }
+                    }
+                } else { 
+                    scoreThem++; 
+                    if (currentServerState === true) {
+                        currentServerState = false; 
+                        if (isFirstPointAfterReceiveStart) {
+                            isFirstPointAfterReceiveStart = false;
+                        }
+                    }
+                }
+
+                var logItem = document.createElement('div');
+                logItem.className = 'log-item editable-log ' + (isUsPoint ? 'us' : 'them');
+                logItem.onclick = (function(idx){ return function(){ editLogAt(idx); }; })(i);
+                
+                var dispPlayerName = getPlayerDisplayName(action.player);
+                if (action.player !== 'team') {
+                    dispPlayerName = '<span style="color: #7dd3fc; font-weight: 600;">' + dispPlayerName + '</span>';
+                }
+                
+                logItem.innerHTML = '<strong>[' + scoreUs + ' - ' + scoreThem + ']</strong> ' + dispPlayerName + ' : ' + getLabel(item, isUsAction) + '<span class="log-actions-hint">編集</span>';
+                logContainer.appendChild(logItem);
+            } else if (action.type === 'timeout') {
+                var logItem = document.createElement('div'); logItem.className = 'log-item timeout editable-log';
+                logItem.onclick = (function(idx){ return function(){ editLogAt(idx); }; })(i);
+                var teamName = action.team === 'us' ? selfTeamName : oppTeamName;
+                logItem.innerHTML = '⏳ T.O: ' + teamName + ' (' + action.scoreAt + ')' + '<span class="log-actions-hint">編集</span>';
+                logContainer.appendChild(logItem);
+            } else if (action.type === 'substitution') {
+                if (action.team === 'us' && action.outPlayer && action.inPlayer) {
+                    for (var posKey in currentRotationState) {
+                        if (currentRotationState[posKey] === action.outPlayer) currentRotationState[posKey] = action.inPlayer;
+                    }
+                }
+                var logItem = document.createElement('div'); logItem.className = 'log-item substitution editable-log';
+                logItem.onclick = (function(idx){ return function(){ editLogAt(idx); }; })(i);
+                var teamName = action.team === 'us' ? selfTeamName : oppTeamName;
+                var detail = '';
+                if (action.team === 'us' && action.outPlayer && action.inPlayer) detail = '：' + getPlayerDisplayName(action.outPlayer) + ' → ' + getPlayerDisplayName(action.inPlayer);
+                if (action.team !== 'us' && action.note) detail = '：' + action.note;
+                logItem.innerHTML = '🔄 交代: ' + teamName + detail + ' (' + action.scoreAt + ')' + '<span class="log-actions-hint">編集</span>';
+                logContainer.appendChild(logItem);
+            } else if (action.type === 'score_adjust') {
+                var beforeText = (action.fromUs || 0) + ' - ' + (action.fromThem || 0);
+                scoreUs = Math.max(0, parseInt(action.toUs, 10) || 0);
+                scoreThem = Math.max(0, parseInt(action.toThem, 10) || 0);
+                var logItem = document.createElement('div'); logItem.className = 'log-item score-adjust editable-log';
+                logItem.onclick = (function(idx){ return function(){ editLogAt(idx); }; })(i);
+                var noteText = action.note ? '：' + action.note : '';
+                logItem.innerHTML = '<strong>[' + scoreUs + ' - ' + scoreThem + ']</strong> ⚙ 得点修正 ' + beforeText + ' → ' + scoreUs + ' - ' + scoreThem + noteText + '<span class="log-actions-hint">編集</span>';
+                logContainer.appendChild(logItem);
+            }
+        }
+
+        hasServeAuthority = currentServerState;
+        document.getElementById('score-us').innerText = scoreUs;
+        document.getElementById('score-them').innerText = scoreThem;
+        updateSetFinishButtonState(scoreUs, scoreThem);
+        logContainer.scrollTop = logContainer.scrollHeight;
+
+        drawCourt(currentRotationState);
+        drawStartingLineupBox();
+
+        var activeData = (currentView === 'today') ? todayData : (currentView === 'all' ? allData : setData);
+        var activeNameMap = getCurrentStatsNameMap();
+        var tbody = document.getElementById('stats-tbody'); tbody.innerHTML = ''; 
+        renderTableRows(tbody, activeData, activeNameMap, playerNumbers);
+
+        // 割合分析表示を更新
+        calculateAndDrawAnalysis(activeData, getCurrentAnalysisOpponentLabel());
+
+        activePlayerHighlightFix(selectedPlayer);
+        saveStorage(); 
+    }
+
+    function csvEscape(value) {
+        var s = String(value === undefined || value === null ? '' : value);
+        return '"' + s.replace(/"/g, '""') + '"';
+    }
+
+    function downloadTextFile(filename, content, mimeType) {
+        var blob = new Blob(['\ufeff' + content], { type: mimeType || 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+
+    function statsToCsvRows(statsData, nameMap, numberMap) {
+        var rows = [['選手名','得点','スパイク○得点','スパイク×ミス','ブロック○決定','ブロック×ミス','サーブ○エース','サーブ×ミス','ミス合計','反則合計']];
+        var list = getSortedStatSummaries(statsData, nameMap, numberMap);
+        for (var j=0; j<list.length; j++) {
+            var s = list[j];
+            rows.push([s.name, s.points, s.ak, s.ae, s.bk, s.be, s.sa, s.se, s.techErrors, s.violations]);
+        }
+        return rows;
+    }
+
+    function rowsToCsv(rows) { return rows.map(function(r){ return r.map(csvEscape).join(','); }).join('\n'); }
+
+    function exportActiveStatsCSV() {
+        var activeData = (currentView === 'today') ? todayData : (currentView === 'all' ? allData : setData);
+        var label = currentView === 'set' ? '現セット' : (currentView === 'today' ? '本日通算' : '全通算');
+        var activeNameMap = getCurrentStatsNameMap();
+        var opponentLabel = getCurrentAnalysisOpponentLabel();
+        var rows = [[getAppFullTitle(), label, '第' + currentSet + 'セット', 'vs ' + opponentLabel], []].concat(statsToCsvRows(activeData, activeNameMap, playerNumbers));
+        downloadTextFile('seimei_volleyball_stats_' + label + '.csv', rowsToCsv(rows), 'text/csv;charset=utf-8;');
+    }
+
+    function exportArchiveDayCSV() {
+        var dayVal = document.getElementById('archive-day-select').value;
+        if (!dayVal) { alert('先に日付を選択してください。'); return; }
+        var daySets = globalArchive.filter(function(x){ return x.date === dayVal; });
+        if (daySets.length === 0) { alert('出力できるデータがありません。'); return; }
+        var aggregatedStats = createEmptyStats();
+        var namesSnap = getArchiveTotalNameMap(daySets, daySets[daySets.length-1].playerNamesSnap || playerNames);
+        for(var k=0; k<daySets.length; k++) {
+            var sData = daySets[k].statsSnap;
+            for(var pKey in sData) for(var sKey in sData[pKey]) aggregatedStats[pKey][sKey] += (sData[pKey][sKey] || 0);
+        }
+        var rows = [[getAppFullTitle(),'アーカイブ1日合計',dayVal,'計' + daySets.length + 'セット'], []].concat(statsToCsvRows(aggregatedStats, namesSnap, daySets[daySets.length-1].playerNumbersSnap || playerNumbers));
+        downloadTextFile('seimei_volleyball_archive_' + dayVal.replace(/\//g,'-') + '.csv', rowsToCsv(rows), 'text/csv;charset=utf-8;');
+    }
+
+    function tableHtmlFromStats(statsData, nameMap) {
+        var rows = statsToCsvRows(statsData, nameMap, playerNumbers);
+        var html = '<table><thead><tr>' + rows[0].map(function(h){return '<th>'+h+'</th>';}).join('') + '</tr></thead><tbody>';
+        for (var i=1; i<rows.length; i++) html += '<tr>' + rows[i].map(function(c){return '<td>'+c+'</td>';}).join('') + '</tr>';
+        return html + '</tbody></table>';
+    }
+
+    function runningLogHtml() {
+        var div = document.createElement('div');
+        var scoreUs = 0, scoreThem = 0;
+        for (var i=0; i<historyLog.length; i++) {
+            var a = historyLog[i];
+            var line = '';
+            if (a.type === 'stat') {
+                var isUsAction = (a.player !== 'team');
+                var isPositive = ['attack_kill','block_kill','serve_ace'].includes(a.item);
+                var isUsPoint = isUsAction ? isPositive : !isPositive;
+                if (isUsPoint) scoreUs++; else scoreThem++;
+                line = '[' + scoreUs + '-' + scoreThem + '] ' + getPlayerDisplayName(a.player) + ' : ' + getLabel(a.item, isUsAction);
+            } else if (a.type === 'timeout') {
+                line = 'T.O: ' + (a.team === 'us' ? selfTeamName : oppTeamName) + ' (' + a.scoreAt + ')';
+            } else if (a.type === 'substitution') {
+                var detail = '';
+                if (a.team === 'us' && a.outPlayer && a.inPlayer) detail = '：' + getPlayerDisplayName(a.outPlayer) + ' → ' + getPlayerDisplayName(a.inPlayer);
+                if (a.team !== 'us' && a.note) detail = '：' + a.note;
+                line = '交代: ' + (a.team === 'us' ? selfTeamName : oppTeamName) + detail + ' (' + a.scoreAt + ')';
+            } else if (a.type === 'score_adjust') {
+                var beforeText = (a.fromUs || 0) + '-' + (a.fromThem || 0);
+                scoreUs = Math.max(0, parseInt(a.toUs, 10) || 0);
+                scoreThem = Math.max(0, parseInt(a.toThem, 10) || 0);
+                line = '[' + scoreUs + '-' + scoreThem + '] 得点修正 ' + beforeText + ' → ' + scoreUs + '-' + scoreThem + (a.note ? '：' + a.note : '');
+            }
+            div.innerHTML += '<div class="print-log">' + line + '</div>';
+        }
+        return div.innerHTML;
+    }
+
+    function openPrintView() {
+        var activeData = (currentView === 'today') ? todayData : (currentView === 'all' ? allData : setData);
+        var label = currentView === 'set' ? '現セット' : (currentView === 'today' ? '本日通算' : '全通算');
+        var activeNameMap = getCurrentStatsNameMap();
+        var opponentLabel = getCurrentAnalysisOpponentLabel();
+        var html = '<html><head><title>SEIMEI Volleyball Report</title><style>body{font-family:Arial,sans-serif;padding:20px;}h1,h2{color:#1e3a8a;}table{width:100%;border-collapse:collapse;font-size:12px;}th,td{border:1px solid #999;padding:6px;text-align:left;}th{background:#f3f4f6}.print-log{border-bottom:1px solid #ddd;padding:4px;font-size:12px;}</style></head><body>' +
+            '<h1>' + getAppFullTitle() + '</h1><h2>' + label + ' / 第' + currentSet + 'セット / vs ' + opponentLabel + '</h2>' +
+            '<h3>スタッツ集計</h3>' + tableHtmlFromStats(activeData, activeNameMap) + '<h3>ランニングスコア</h3>' + runningLogHtml() +
+            '<script>window.onload=function(){window.print();}<\/script></body></html><!-- Ver.1.2.27 match-management -->';
+        var w = window.open('', '_blank'); w.document.open(); w.document.write(html); w.document.close();
+    }
+
+    function openArchivePrintView() {
+        var dayVal = document.getElementById('archive-day-select').value;
+        if (!dayVal) { alert('先に日付を選択してください。'); return; }
+        viewArchiveDayTotal();
+        var printContents = document.getElementById('archive-display-area').innerHTML;
+        var html = '<html><head><title>Archive Report</title><style>body{font-family:Arial,sans-serif;padding:20px;}h4,h5{color:#1e3a8a;}table{width:100%;border-collapse:collapse;font-size:12px;}th,td{border:1px solid #999;padding:6px;text-align:left;}th{background:#f3f4f6}.log-container{display:none;}</style></head><body>' + printContents + '<script>window.onload=function(){window.print();}<\/script></body></html><!-- Ver.1.2.27 match-management -->';
+        var w = window.open('', '_blank'); w.document.open(); w.document.write(html); w.document.close();
+    }
+
+    function getLabel(item, isUsAction) {
+        return getLabelWithMap(item, isUsAction, playerNames);
+    }
+
+    function getLabelWithMap(item, isUsAction, nameMap) {
+        var labels = {
+            attack_kill: 'スパイク', attack_error: 'スパイクミス', block_kill: 'ブロック', block_error: 'ブロックミス',
+            serve_ace: 'サービスエース', serve_error: 'サーブミス', reception_error: 'レセプションミス', dig_error: 'ディグミス', toss_error: 'トスミス', other_error: 'その他のミス',
+            v_dribble: 'ドリブル', v_net: 'タッチネット', v_over: 'オーバーネット', v_passing: 'パッシングザセンターライン', v_positional: 'ポジショナルフォールト', v_hold: 'ホールディング'
+        };
+        if (!isUsAction) {
+            if (item === 'attack_kill') return 'スパイク';
+            if (item === 'serve_ace') return 'サービスエース';
+            if (item === 'block_kill') return 'ブロック';
+            return labels[item] || item;
+        }
+        return labels[item] || item;
+    }
+
+
+    function buildAppDataBackup() {
+        return {
+            appName: getAppFullTitle(),
+            appVersion: 'tablet-dark-data-zip-v1.2.27',
+            exportedAt: new Date().toISOString(),
+            matchType: matchType,
+            officialMatchNumber: officialMatchNumber,
+            matchDateKey: matchDateKey,
+            currentSet: currentSet,
+            historyLog: historyLog,
+            timeoutCount: timeoutCount,
+            subCount: subCount,
+            setResults: setResults,
+            globalArchive: globalArchive,
+            autoBackups: autoBackups,
+            playerNames: playerNames,
+            playerNumbers: playerNumbers,
+            selectedPlayer: selectedPlayer,
+            oppTeamName: oppTeamName,
+            appTitlePrefix: appTitlePrefix,
+            selfTeamName: selfTeamName,
+            startingLineup: startingLineup,
+            startSideSetting: startSideSetting,
+            hasServeAuthority: hasServeAuthority,
+            setData: setData,
+            todayData: todayData,
+            allData: allData,
+            currentView: currentView
+        };
+    }
+
+
+    function createAutoBackup(label) {
+        try {
+            var snapshot = buildAppDataBackup();
+            snapshot.autoBackups = [];
+            var item = {
+                id: 'backup_' + Date.now(),
+                label: label || '自動バックアップ',
+                createdAt: new Date().toISOString(),
+                summary: label || '',
+                data: snapshot
+            };
+            autoBackups.unshift(item);
+            if (autoBackups.length > 30) autoBackups = autoBackups.slice(0, 30);
+            localStorage.setItem('vball_autoBackups_s', JSON.stringify(autoBackups));
+            updateAutoBackupUI();
+        } catch (err) {
+            console.warn('Auto backup failed:', err);
+        }
+    }
+
+    function updateAutoBackupUI() {
+        var countEl = document.getElementById('auto-backup-count');
+        var listEl = document.getElementById('auto-backup-list');
+        if (countEl) countEl.innerText = Array.isArray(autoBackups) ? autoBackups.length : 0;
+        if (!listEl) return;
+        if (!Array.isArray(autoBackups) || autoBackups.length === 0) {
+            listEl.innerHTML = '<div style="color:#64748b;text-align:center;">バックアップなし</div>';
+            return;
+        }
+        listEl.innerHTML = autoBackups.slice(0, 10).map(function(b){
+            var d = b.createdAt ? new Date(b.createdAt) : null;
+            var time = d && !isNaN(d.getTime()) ? (d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0')) : '';
+            return '<div class="backup-item"><b>' + (time || '日時不明') + '</b><br>' + (b.label || b.summary || '自動バックアップ') + '</div>';
+        }).join('');
+    }
+
+    function exportAppDataZIP() {
+        // 外部ライブラリなしで安定運用するため、内容は復元可能なJSONとして保存します。
+        // ZIPボタンからも同じ完全バックアップを取得できます。
+        exportAppDataJSON();
+    }
+
+    function importAppDataFile(event) {
+        var file = event.target.files && event.target.files[0];
+        event.target.value = '';
+        if (!file) return;
+        if (/\.zip$/i.test(file.name)) {
+            alert('この修正版では安全のためZIP直接読み込みではなく、JSONバックアップを読み込んでください。');
+            return;
+        }
+        importAppDataJSON({ target: { files: [file], value: '' } });
+    }
+
+    function exportAppDataJSON() {
+        var data = buildAppDataBackup();
+        var now = new Date();
+        var stamp = now.getFullYear().toString() +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0') + '_' +
+            String(now.getHours()).padStart(2, '0') +
+            String(now.getMinutes()).padStart(2, '0');
+        var filename = 'seimei_volleyball_backup_' + stamp + '.json';
+        downloadTextFile(filename, JSON.stringify(data, null, 2), 'application/json;charset=utf-8;');
+    }
+
+    function normalizeImportedStats(stats) {
+        var base = createEmptyStats();
+        if (!stats) return base;
+        for (var pKey in base) {
+            if (!stats[pKey]) continue;
+            for (var sKey in base[pKey]) {
+                base[pKey][sKey] = Number(stats[pKey][sKey] || 0);
+            }
+        }
+        return base;
+    }
+
+    function applyImportedAppData(data) {
+        if (!data || typeof data !== 'object') throw new Error('データ形式が正しくありません。');
+        if (data.appName && String(data.appName).indexOf('Volleyball Tracker') === -1) {
+            if (!confirm('このファイルは別アプリのデータの可能性があります。読み込みを続けますか？')) return;
+        }
+
+        currentSet = Number(data.currentSet || 1);
+        historyLog = Array.isArray(data.historyLog) ? data.historyLog : [];
+        timeoutCount = data.timeoutCount || { us: 0, them: 0 };
+        subCount = data.subCount || { us: 0, them: 0 };
+        setResults = Array.isArray(data.setResults) ? data.setResults : [];
+        globalArchive = Array.isArray(data.globalArchive) ? data.globalArchive : [];
+        autoBackups = Array.isArray(data.autoBackups) ? data.autoBackups : [];
+        playerNames = data.playerNames || playerNames;
+        playerNumbers = normalizePlayerNumbers(data.playerNumbers || playerNumbers);
+        if (!playerNames.team) playerNames.team = '相手チーム(全体)';
+        selectedPlayer = data.selectedPlayer || 'p1';
+        oppTeamName = data.oppTeamName || (playerNames.team || '相手').replace('(全体)', '') || '相手';
+        appTitlePrefix = data.appTitlePrefix || appTitlePrefix || 'SEIMEI HS';
+        selfTeamName = data.selfTeamName || selfTeamName || '清明';
+        matchType = data.matchType || matchType || 'practice';
+        officialMatchNumber = parseInt(data.officialMatchNumber || officialMatchNumber || 1, 10) || 1;
+        matchDateKey = data.matchDateKey || matchDateKey || getTodayKey();
+        startingLineup = data.startingLineup || { 1: 'p1', 2: 'p2', 3: 'p3', 4: 'p4', 5: 'p5', 6: 'p6' };
+        startSideSetting = data.startSideSetting || 'S';
+        hasServeAuthority = data.hasServeAuthority !== false;
+        setData = normalizeImportedStats(data.setData);
+        todayData = normalizeImportedStats(data.todayData);
+        allData = normalizeImportedStats(data.allData);
+        currentView = data.currentView || 'set';
+
+        saveStorage();
+        initSetup();
+        switchView(currentView);
+        updateUI();
+        closeModal('dataModal');
+        alert('データを読み込みました。');
+    }
+
+    function importAppDataJSON(event) {
+        var file = event.target.files && event.target.files[0];
+        event.target.value = '';
+        if (!file) return;
+        if (!confirm('現在のブラウザ内データを、選択したファイルの内容で上書きします。よろしいですか？')) return;
+
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var data = JSON.parse(e.target.result);
+                applyImportedAppData(data);
+            } catch (err) {
+                alert('読み込みに失敗しました。JSONファイルの形式を確認してください。\n' + err.message);
+            }
+        };
+        reader.onerror = function() { alert('ファイルを読み込めませんでした。'); };
+        reader.readAsText(file, 'utf-8');
+    }
+
+    function resetAll() {
+        if (confirm('⚠️【完全にリセットします】選手名、現在のデータ、過去のすべてのアーカイブが消去されます。よろしいですか？')) {
+            localStorage.clear(); currentSet = 1; document.getElementById('current-set-num').innerText = currentSet;
+            setData = createEmptyStats(); todayData = createEmptyStats(); allData = createEmptyStats();
+            startingLineup = { 1: 'p1', 2: 'p2', 3: 'p3', 4: 'p4', 5: 'p5', 6: 'p6' };
+            startSideSetting = 'S'; hasServeAuthority = true; oppTeamName = '相手'; appTitlePrefix = 'SEIMEI HS'; selfTeamName = '清明'; matchType = 'practice'; officialMatchNumber = 1; matchDateKey = getTodayKey();
+            historyLog = []; setResults = []; timeoutCount = { us: 0, them: 0 }; subCount = { us: 0, them: 0 }; globalArchive = []; autoBackups = [];
+            switchView('set'); initSetup(); updateUI();
+        }
+    }
+
+
+    function registerPWAServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(function(reg) { console.log('Service Worker registered:', reg.scope); })
+                    .catch(function(err) { console.log('Service Worker registration failed:', err); });
+            });
+        }
+    }
+    registerPWAServiceWorker();
+
+    initSetup(); updateUI();
+</script>
+</body>
+</html><!-- Ver.1.2.27 match-management -->
