@@ -1,4 +1,4 @@
-const CACHE_NAME = 'seimei-vb-tracker-v1-2-35-rotation-preview-apply';
+const CACHE_NAME = 'seimei-vb-tracker-v1-2-41';
 const ASSETS = [
   './',
   './index.html',
