@@ -1473,7 +1473,7 @@
         <div class="modal-window" style="max-width:760px;">
             <div class="modal-header"><h2>💾 データ保存・読み込み</h2><button class="modal-close" onclick="closeModal('dataModal')">閉じる</button></div>
             <div class="modal-body">
-                <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:10px;margin-bottom:12px;color:#cbd5e1;font-size:0.85rem;">📱 PWA対応版です。AndroidはChrome、iPadはSafariで開き、ホーム画面に追加するとアプリ風に使えます。<br><span style="display:block;margin-top:6px;color:#93c5fd;font-weight:900;">Ver.1.2.41</span></div>
+                <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:10px;margin-bottom:12px;color:#cbd5e1;font-size:0.85rem;">📱 PWA対応版です。AndroidはChrome、iPadはSafariで開き、ホーム画面に追加するとアプリ風に使えます。<br><span style="display:block;margin-top:6px;color:#93c5fd;font-weight:900;">Ver.1.2.42</span></div>
                 <div class="panel">
                     <h3>外部ファイルへバックアップ</h3>
                     <p style="font-size:0.85rem; color:#cbd5e1; line-height:1.7;">現在の試合データ、選手名、S-Lineup、本日履歴、過去の記録をまとめて外部ファイルに保存できます。JSON単体に加えて、CSVや説明書を含むZIP一括保存にも対応しました。</p>
@@ -1568,6 +1568,30 @@
                 <div>
                     <h5 style="margin: 5px 0; color: var(--dark);" id="archive-log-title">📝 ランニングスコア</h5>
                     <div class="log-container" id="archive-running-score-log" style="max-height: 400px;"></div>
+                </div>
+            </div>
+
+            <div class="analysis-box archive-analysis-box" id="archive-analysis-box" style="margin-top:15px;">
+                <div class="analysis-title">📈 得点割合分析（閲覧中データ）</div>
+                <div class="ratio-bar-container">
+                    <div class="ratio-bar-labels">
+                        <span style="color:var(--primary);"><span class="self-team-text-label">清明</span>の得点内訳</span>
+                        <span id="archive-analysis-us-summary">0点 (自力 0% : 相手ミス 0%)</span>
+                    </div>
+                    <div class="ratio-bar">
+                        <div id="archive-bar-us-own" class="ratio-fill-own" style="width: 0%;"></div>
+                        <div id="archive-bar-us-opp-err" class="ratio-fill-opp-err" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <div class="ratio-bar-container" style="margin-top:10px;">
+                    <div class="ratio-bar-labels">
+                        <span style="color:var(--danger);"><span id="archive-analysis-opp-label">相手</span>の得点内訳</span>
+                        <span id="archive-analysis-them-summary">0点 (自力 0% : 清明ミス 0%)</span>
+                    </div>
+                    <div class="ratio-bar">
+                        <div id="archive-bar-them-opp" class="ratio-fill-opp" style="width: 0%;"></div>
+                        <div id="archive-bar-them-own-err" class="ratio-fill-own-err" style="width: 0%;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3074,6 +3098,7 @@
         var matchedLabel = matched.matchLabel ? (matched.matchLabel + ' ') : '';
         titleEl.innerText = '📑 【1セット記録】 ' + matched.timestamp + ' ' + matchedLabel + 'vs ' + matched.oppName + ' (第' + matched.setNum + 'S: ' + matched.score + ') ' + resultMark;
         renderTableRows(tbody, matched.statsSnap, matched.playerNamesSnap, matched.playerNumbersSnap);
+        calculateAndDrawArchiveAnalysis(matched.statsSnap, matched.oppName || '相手');
         
         logTitleEl.innerText = '📝 第' + matched.setNum + 'セットのランニングスコア';
         if (matched.historyLogSnap && matched.historyLogSnap.length > 0) {
@@ -3119,6 +3144,7 @@
         var oppTitle = oppList.length === 1 ? oppList[0] : '複数（' + oppList.join(', ') + '）';
         titleEl.innerText = '📅 【1日合計データ】 ' + dayVal + ' （相手: ' + oppTitle + ' / 計 ' + daySets.length + 'セット）';
         renderTableRows(tbody, aggregatedStats, archiveNameMap, daySets[daySets.length-1].playerNumbersSnap || playerNumbers);
+        calculateAndDrawArchiveAnalysis(aggregatedStats, oppList.length === 1 ? oppList[0] : '相手');
         
         logTitleEl.innerText = '📝 ランニングスコア';
         logContainer.innerHTML = '<div style="color:#aaa; text-align:center; padding-top:10px;">※1日合算データではランニングスコアは表示されません。各セットごとの詳細ログをご覧ください。</div>';
@@ -3286,6 +3312,58 @@
         document.getElementById('analysis-them-summary').innerText = totalThemScore + '点 (自力 ' + themOwnPct + '% : ' + (selfTeamName || '清明') + 'ミス ' + themUsErrPct + '%)';
         document.getElementById('bar-them-opp').style.width = themOwnPct + '%';
         document.getElementById('bar-them-own-err').style.width = themUsErrPct + '%';
+    }
+
+
+    function calculateAndDrawArchiveAnalysis(activeData, opponentLabel) {
+        var oppLabelEl = document.getElementById('archive-analysis-opp-label');
+        if (oppLabelEl) oppLabelEl.innerText = opponentLabel || '相手';
+
+        var usOwnPoint = 0;
+        for (var i = 1; i <= MAX_PLAYERS; i++) {
+            var pd = activeData['p' + i] || {};
+            usOwnPoint += (pd.attack_kill || 0) + (pd.block_kill || 0) + (pd.serve_ace || 0);
+        }
+        var usTeamData = activeData['us_team'] || {};
+        usOwnPoint += (usTeamData.attack_kill || 0) + (usTeamData.block_kill || 0) + (usTeamData.serve_ace || 0);
+
+        var oppData = activeData['team'] || {};
+        var usPointFromOppErr = (oppData.attack_error || 0) + (oppData.block_error || 0) + (oppData.serve_error || 0) +
+                                (oppData.reception_error || 0) + (oppData.dig_error || 0) + (oppData.toss_error || 0) + (oppData.miscommunication_error || 0) + (oppData.other_error || 0) +
+                                (oppData.v_dribble || 0) + (oppData.v_net || 0) + (oppData.v_over || 0) + (oppData.v_passing || 0) + (oppData.v_positional || 0) + (oppData.v_hold || 0) + (oppData.v_backrow || 0);
+        var totalUsScore = usOwnPoint + usPointFromOppErr;
+        var usOwnPct = totalUsScore > 0 ? Math.round((usOwnPoint / totalUsScore) * 100) : 0;
+        var usOppErrPct = totalUsScore > 0 ? 100 - usOwnPct : 0;
+
+        var usSummary = document.getElementById('archive-analysis-us-summary');
+        var usOwnBar = document.getElementById('archive-bar-us-own');
+        var usErrBar = document.getElementById('archive-bar-us-opp-err');
+        if (usSummary) usSummary.innerText = totalUsScore + '点 (自力 ' + usOwnPct + '% : 相手ミス ' + usOppErrPct + '%)';
+        if (usOwnBar) usOwnBar.style.width = usOwnPct + '%';
+        if (usErrBar) usErrBar.style.width = usOppErrPct + '%';
+
+        var themOwnPoint = (oppData.attack_kill || 0) + (oppData.block_kill || 0) + (oppData.serve_ace || 0);
+        var themPointFromUsErr = 0;
+        for (var j = 1; j <= MAX_PLAYERS; j++) {
+            var upd = activeData['p' + j] || {};
+            themPointFromUsErr += (upd.attack_error || 0) + (upd.block_error || 0) + (upd.serve_error || 0) +
+                                  (upd.reception_error || 0) + (upd.dig_error || 0) + (upd.toss_error || 0) + (upd.miscommunication_error || 0) + (upd.other_error || 0) +
+                                  (upd.v_dribble || 0) + (upd.v_net || 0) + (upd.v_over || 0) + (upd.v_passing || 0) + (upd.v_positional || 0) + (upd.v_hold || 0) + (upd.v_backrow || 0);
+        }
+        themPointFromUsErr += (usTeamData.attack_error || 0) + (usTeamData.block_error || 0) + (usTeamData.serve_error || 0) +
+                              (usTeamData.reception_error || 0) + (usTeamData.dig_error || 0) + (usTeamData.toss_error || 0) + (usTeamData.miscommunication_error || 0) + (usTeamData.other_error || 0) +
+                              (usTeamData.v_dribble || 0) + (usTeamData.v_net || 0) + (usTeamData.v_over || 0) + (usTeamData.v_passing || 0) + (usTeamData.v_positional || 0) + (usTeamData.v_hold || 0) + (usTeamData.v_backrow || 0);
+
+        var totalThemScore = themOwnPoint + themPointFromUsErr;
+        var themOwnPct = totalThemScore > 0 ? Math.round((themOwnPoint / totalThemScore) * 100) : 0;
+        var themUsErrPct = totalThemScore > 0 ? 100 - themOwnPct : 0;
+
+        var themSummary = document.getElementById('archive-analysis-them-summary');
+        var themOwnBar = document.getElementById('archive-bar-them-opp');
+        var themErrBar = document.getElementById('archive-bar-them-own-err');
+        if (themSummary) themSummary.innerText = totalThemScore + '点 (自力 ' + themOwnPct + '% : ' + (selfTeamName || '清明') + 'ミス ' + themUsErrPct + '%)';
+        if (themOwnBar) themOwnBar.style.width = themOwnPct + '%';
+        if (themErrBar) themErrBar.style.width = themUsErrPct + '%';
     }
 
     function clearArchive() {
@@ -3568,7 +3646,7 @@
         var html = '<html><head><title>SEIMEI Volleyball Report</title><style>body{font-family:Arial,sans-serif;padding:20px;}h1,h2{color:#1e3a8a;}table{width:100%;border-collapse:collapse;font-size:12px;}th,td{border:1px solid #999;padding:6px;text-align:left;}th{background:#f3f4f6}.print-log{border-bottom:1px solid #ddd;padding:4px;font-size:12px;}</style></head><body>' +
             '<h1>' + getAppFullTitle() + '</h1><h2>' + label + ' / 第' + currentSet + 'セット / vs ' + opponentLabel + '</h2>' +
             '<h3>スタッツ集計</h3>' + tableHtmlFromStats(activeData, activeNameMap) + '<h3>ランニングスコア</h3>' + runningLogHtml() +
-            '<script>window.onload=function(){window.print();}<\/script></body></html><!-- Ver.1.2.41 set-center-layout -->';
+            '<script>window.onload=function(){window.print();}<\/script></body></html><!-- Ver.1.2.42 set-center-layout -->';
         var w = window.open('', '_blank'); w.document.open(); w.document.write(html); w.document.close();
     }
 
@@ -3577,7 +3655,7 @@
         if (!dayVal) { alert('先に日付を選択してください。'); return; }
         viewArchiveDayTotal();
         var printContents = document.getElementById('archive-display-area').innerHTML;
-        var html = '<html><head><title>Archive Report</title><style>body{font-family:Arial,sans-serif;padding:20px;}h4,h5{color:#1e3a8a;}table{width:100%;border-collapse:collapse;font-size:12px;}th,td{border:1px solid #999;padding:6px;text-align:left;}th{background:#f3f4f6}.log-container{display:none;}</style></head><body>' + printContents + '<script>window.onload=function(){window.print();}<\/script></body></html><!-- Ver.1.2.41 set-center-layout -->';
+        var html = '<html><head><title>Archive Report</title><style>body{font-family:Arial,sans-serif;padding:20px;}h4,h5{color:#1e3a8a;}table{width:100%;border-collapse:collapse;font-size:12px;}th,td{border:1px solid #999;padding:6px;text-align:left;}th{background:#f3f4f6}.log-container{display:none;}</style></head><body>' + printContents + '<script>window.onload=function(){window.print();}<\/script></body></html><!-- Ver.1.2.42 set-center-layout -->';
         var w = window.open('', '_blank'); w.document.open(); w.document.write(html); w.document.close();
     }
 
@@ -3880,4 +3958,4 @@
     initSetup(); updateUI();
 </script>
 </body>
-</html><!-- Ver.1.2.41 set-center-layout -->
+</html><!-- Ver.1.2.42 set-center-layout -->
